@@ -1,0 +1,70 @@
+{
+    "api_name": "Ingest Runs (Multipart)",
+    "description": "Ingests multiple runs, feedback objects, and binary attachments in a single multipart/form-data request",
+    "method": "POST",
+    "endpoint": "/runs/multipart",
+    "content_type": "multipart/form-data",
+    "part_name_pattern": "<event>.<run_id>[.<field>]",
+    "events": ["post", "patch", "feedback", "attachment"],
+    "part_types": {
+        "run_create": {
+            "pattern": "post.{run_id}",
+            "type": "string",
+            "format": "binary",
+            "description": "Run to create (JSON)"
+        },
+        "run_update": {
+            "pattern": "patch.{run_id}",
+            "type": "string",
+            "format": "binary",
+            "description": "Run to update (JSON)"
+        },
+        "run_inputs": {
+            "pattern": "post.{run_id}.inputs",
+            "type": "string",
+            "format": "binary",
+            "description": "Large inputs object (JSON) stored out-of-band"
+        },
+        "run_outputs": {
+            "pattern": "patch.{run_id}.outputs",
+            "type": "string",
+            "format": "binary",
+            "description": "Large outputs object (JSON) stored out-of-band"
+        },
+        "feedback": {
+            "pattern": "feedback.{run_id}",
+            "type": "string",
+            "format": "binary",
+            "description": "Feedback object (JSON) – must include trace_id",
+            "required_fields": ["trace_id"]
+        },
+        "attachment": {
+            "pattern": "attachment.{run_id}.{filename}",
+            "type": "file",
+            "format": "binary",
+            "description": "Binary attachment linked to run {run_id}",
+            "storage": "S3"
+        }
+    },
+    "out_of_band_fields": [
+        "inputs",
+        "outputs",
+        "events",
+        "error",
+        "extra",
+        "serialized"
+    ],
+    "headers": {
+        "required": ["Content-Type"],
+        "length_requirement": "Content-Length header OR length parameter",
+        "content_encoding": {
+            "per_part": false,
+            "top_level": ["zstd"]
+        }
+    },
+    "performance_notes": [
+        "Best performance for high-volume ingestion",
+        "Per-part Content-Encoding is not allowed",
+        "Top-level request may be Content-Encoding: zstd"
+    ]
+}

@@ -1,0 +1,200 @@
+json-viewer {
+    /* Background, font and indentation */
+    --background-color: #ffffff;
+    --color: #333333;
+    --font-family: monospace;
+    --font-size: 1rem;
+    --line-height: 1.2rem;
+    --indent-size: 0.5em;
+    --indentguide-size: 1px;
+    --indentguide-style: solid;
+    --indentguide-color: #cccccc;
+    --indentguide-color-active: #999999;
+    --indentguide: var(--indentguide-size) var(--indentguide-style)
+        var(--indentguide-color);
+    --indentguide-active: var(--indentguide-size) var(--indentguide-style)
+        var(--indentguide-color-active);
+    --outline-color: #cccccc;
+    --outline-width: 1px;
+    --outline-style: dotted;
+
+    /* Types colors */
+    --string-color: #008000;
+    --number-color: #8b0000;
+    --boolean-color: #0000ff;
+    --null-color: #800080;
+    --property-color: #00008b;
+
+    /* Collapsed node preview */
+    --preview-color: #a0522d;
+
+    /* Search highlight color */
+    --highlight-color: #ff4500;
+}
+#app {
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+}
+/* 自定义滚动条 */
+.scrollbar {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+.scrollbar::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+.scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+.scrollbar::-webkit-scrollbar-corner {
+    background: #f1f1f1;
+}
+
+/* 代码高亮 */
+.json-key {
+    color: #0066cc;
+}
+.json-string {
+    color: #009900;
+}
+.json-number {
+    color: #ff6600;
+}
+.json-boolean {
+    color: #cc0066;
+}
+.json-null {
+    color: #999999;
+}
+
+/* 响应式布局 */
+@media (max-width: 1024px) {
+    .three-column {
+        grid-template-columns: 280px 1fr;
+    }
+    .right-panel {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .three-column {
+        grid-template-columns: 1fr;
+    }
+    .left-panel {
+        position: fixed;
+        z-index: 100;
+        left: -320px;
+        transition: left 0.3s;
+        width: 320px;
+        height: 100vh;
+        background: white;
+        border-right: 1px solid #e5e7eb;
+        overflow: hidden;
+    }
+    .left-panel.open {
+        left: 0;
+    }
+    .mobile-menu {
+        display: block;
+    }
+
+    /* 移动端滚动条优化 */
+    .scrollbar {
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: #c1c1c1 #f1f1f1;
+    }
+}
+
+/* 加载动画 */
+.loading {
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* 卡片悬停效果 */
+.card-hover {
+    transition: all 0.2s ease;
+}
+.card-hover:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 状态指示器 */
+.status-success::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    margin-right: 6px;
+}
+
+.status-error::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ef4444;
+    margin-right: 6px;
+}
+
+.status-pending::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f59e0b;
+    margin-right: 6px;
+}
+@font-face {
+    font-family: "FontWithASyntaxHighlighter";
+    src: url("https://cdn.jsdelivr.net/gh/hlotvonen/FontWithASyntaxHighlighter/FontWithASyntaxHighlighter-Regular.woff2")
+        format("woff2");
+}
+@font-palette-values --CodePalette {
+    font-family: "FontWithASyntaxHighlighter";
+    /* github light 风格配色 */
+    override-colors: 0 #d73a49, /* keywords, {} - 红色 */ 1 #6a737d,
+        /* comments - 灰色 */ 2 #e36209, /* literals - 橙色 */ 3 #005cc5,
+        /* numbers - 蓝色 */ 4 #6f42c1, /* functions, [] - 紫色 */ 5 #22863a,
+        /* js others - 绿色 */ 6 #24292e, /* not in use - 深灰 */ 7 #b31d28,
+        /* hotpink - 深红 */ 8 #032f62
+            /* inside quotes, css properties, few chars - 深蓝 */;
+}
+code {
+    font-family: "FontWithASyntaxHighlighter", monospace;
+    font-palette: --CodePalette;
+}
+
+/* 隐去 summary 的三角 */
+summary {
+    list-style: none;
+}
+summary::-webkit-details-marker {
+    display: none;
+}

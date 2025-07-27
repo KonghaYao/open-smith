@@ -1,0 +1,44 @@
+{
+    "name": "@langgraph-js/open-smith",
+    "type": "module",
+    "version": "1.0.0",
+    "description": "Open Smith",
+    "author": "KonghaYao",
+    "license": "Apache-2.0",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "publishConfig": {
+        "registry": "https://registry.npmjs.org/",
+        "access": "public"
+    },
+    "scripts": {
+        "dev": "bun src/index.ts",
+        "build": "rm -r dist && tsc",
+        "prepublishOnly": "pnpm build"
+    },
+    "bin": {
+        "open-smith": "dist/index.js"
+    },
+    "dependencies": {
+        "@hono/node-server": "^1.15.0",
+        "@langchain/core": "^0.3.66",
+        "@langchain/openai": "^0.6.2",
+        "@types/pg": "^8.15.4",
+        "better-sqlite3": "^12.2.0",
+        "hono": "^4.8.4",
+        "pg": "^8.16.3",
+        "uuid": "^11.0.0",
+        "zod-to-json-schema": "^3.24.6"
+    },
+    "devDependencies": {
+        "@types/better-sqlite3": "^7.6.13",
+        "@types/node": "^20.11.17",
+        "@types/uuid": "^10.0.0",
+        "typescript": "^5.8.3"
+    },
+    "pnpm": {
+        "onlyBuiltDependencies": [
+            "better-sqlite3"
+        ]
+    }
+}

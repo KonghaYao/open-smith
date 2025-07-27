@@ -1,0 +1,42 @@
+{
+    "multipart_patterns": {
+        "run_create": "post\\.([^.]+)$",
+        "run_update": "patch\\.([^.]+)$",
+        "run_field": "(post|patch)\\.([^.]+)\\.(.+)$",
+        "feedback": "feedback\\.([^.]+)$",
+        "attachment": "attachment\\.([^.]+)\\.(.+)$"
+    },
+    "supported_events": ["post", "patch", "feedback", "attachment"],
+    "out_of_band_fields": [
+        "inputs",
+        "outputs",
+        "events",
+        "error",
+        "extra",
+        "serialized"
+    ],
+    "field_types": {
+        "run_payload": "json",
+        "feedback_payload": "json",
+        "out_of_band_data": "json",
+        "attachment": "binary"
+    },
+    "validation_rules": {
+        "feedback_required_fields": ["trace_id"],
+        "content_type_required": true,
+        "content_length_required": true,
+        "per_part_encoding_forbidden": true
+    },
+    "storage_config": {
+        "attachment_storage": "S3",
+        "compression_support": ["zstd"]
+    },
+    "examples": {
+        "run_create": "post.run_123",
+        "run_update": "patch.run_456",
+        "run_inputs": "post.run_123.inputs",
+        "run_outputs": "patch.run_456.outputs",
+        "feedback": "feedback.run_789",
+        "attachment": "attachment.run_123.screenshot.png"
+    }
+}
