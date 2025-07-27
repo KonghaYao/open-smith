@@ -11,13 +11,13 @@ const formatTimestamp = (time: string | void) => {
 export interface RunRecord {
     id: string;
     trace_id?: string;
-    name?: string;
+    name: string;
     run_type?: string;
     system?: string; // 系统标识，来自 x-api-key
     thread_id?: string; // 线程ID，来自 extra.metadata.thread_id
     user_id?: string; // 用户ID，来自 extra.metadata.user_id
-    start_time?: string;
-    end_time?: string;
+    start_time: string;
+    end_time: string;
     inputs?: string; // JSON string
     outputs?: string; // JSON string
     events?: string; // JSON string
@@ -80,13 +80,13 @@ export interface DatabaseAdapter {
     exec(sql: string): Promise<void>;
     prepare(sql: string): Promise<PreparedStatement>;
     transaction<T extends any[], R>(
-        fn: (...args: T) => Promise<R>,
+        fn: (...args: T) => Promise<R>
     ): Promise<(...args: T) => Promise<R>>;
     close(): Promise<void>;
     getStringAggregateFunction(
         column: string,
         distinct: boolean,
-        delimiter: string,
+        delimiter: string
     ): string;
     getPlaceholder(index: number): string;
 }
@@ -139,7 +139,7 @@ export class TraceDatabase {
                             }, 0);
                         return col + sum;
                     },
-                    0,
+                    0
                 );
             }
         } catch (error) {
@@ -150,7 +150,7 @@ export class TraceDatabase {
 
     // 从 events 字段中提取 time_to_first_token 的辅助方法
     private extractTimeToFirstTokenFromEvents(
-        events?: string | object,
+        events?: string | object
     ): number {
         if (!events) return 0;
         try {
@@ -169,7 +169,7 @@ export class TraceDatabase {
 
     // 从 outputs 字段中提取 model_name 的辅助方法
     private extractModelNameFromOutputs(
-        outputs?: string | object,
+        outputs?: string | object
     ): string | undefined {
         if (!outputs) return undefined;
         try {
@@ -318,12 +318,12 @@ export class TraceDatabase {
                 ${this.adapter.getStringAggregateFunction(
                     "run_type",
                     true,
-                    ",",
+                    ","
                 )} as run_types,
                 ${this.adapter.getStringAggregateFunction(
                     "system",
                     true,
-                    ",",
+                    ","
                 )} as systems,
                 SUM(total_tokens) as total_tokens_sum
             FROM runs 
@@ -339,7 +339,7 @@ export class TraceDatabase {
                 // 获取该 trace 的 feedback 和 attachments 统计
                 const feedbackStmt = await this.adapter.prepare(`
                 SELECT COUNT(*) as count FROM feedback WHERE trace_id = ${this.adapter.getPlaceholder(
-                    1,
+                    1
                 )}
             `);
                 const attachmentStmt = await this.adapter.prepare(`
@@ -371,7 +371,7 @@ export class TraceDatabase {
                         : [],
                     total_tokens_sum: trace.total_tokens_sum || 0,
                 };
-            }),
+            })
         );
     }
 
@@ -386,7 +386,7 @@ export class TraceDatabase {
             // 如果系统不存在，自动创建一个
             system = await this.createSystem(
                 systemName,
-                `自动创建的系统: ${systemName}`,
+                `自动创建的系统: ${systemName}`
             );
         }
         return system;
@@ -412,13 +412,13 @@ export class TraceDatabase {
         const record: RunRecord = {
             id,
             trace_id: runData.trace_id,
-            name: runData.name,
+            name: runData.name!,
             run_type: runData.run_type,
             system: runData.system,
             thread_id: threadId,
             user_id: userId,
-            start_time: formatTimestamp(runData.start_time),
-            end_time: formatTimestamp(runData.end_time),
+            start_time: formatTimestamp(runData.start_time)!,
+            end_time: formatTimestamp(runData.end_time)!,
             inputs: runData.inputs ? JSON.stringify(runData.inputs) : undefined,
             outputs: runData.outputs
                 ? JSON.stringify(runData.outputs)
@@ -485,7 +485,7 @@ export class TraceDatabase {
 
     async updateRun(
         runId: string,
-        runData: RunPayload,
+        runData: RunPayload
     ): Promise<RunRecord | null> {
         const now = new Date().toISOString();
         const updateFields: string[] = [];
@@ -494,70 +494,70 @@ export class TraceDatabase {
 
         if (runData.trace_id !== undefined) {
             updateFields.push(
-                `trace_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `trace_id = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(runData.trace_id);
         }
         if (runData.name !== undefined) {
             updateFields.push(
-                `name = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `name = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(runData.name);
         }
         if (runData.run_type !== undefined) {
             updateFields.push(
-                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(runData.run_type);
         }
         if (runData.system !== undefined) {
             updateFields.push(
-                `system = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `system = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(runData.system);
         }
         if (runData.start_time !== undefined) {
             updateFields.push(
-                `start_time = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `start_time = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(formatTimestamp(runData.start_time));
         }
         if (runData.end_time !== undefined) {
             updateFields.push(
-                `end_time = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `end_time = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(formatTimestamp(runData.end_time));
         }
         if (runData.inputs !== undefined) {
             updateFields.push(
-                `inputs = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `inputs = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(JSON.stringify(runData.inputs));
         }
         if (runData.outputs !== undefined) {
             updateFields.push(
-                `outputs = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `outputs = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(JSON.stringify(runData.outputs));
 
             // 如果 outputs 被更新，重新计算并更新 total_tokens
             updateFields.push(
-                `total_tokens = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `total_tokens = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(
-                this.extractTotalTokensFromOutputs(runData.outputs),
+                this.extractTotalTokensFromOutputs(runData.outputs)
             );
 
             // 如果 outputs 被更新，重新计算并更新 model_name
             updateFields.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(
-                this.extractModelNameFromOutputs(runData.outputs),
+                this.extractModelNameFromOutputs(runData.outputs)
             );
         } else if (runData.total_tokens !== undefined) {
             updateFields.push(
-                `total_tokens = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `total_tokens = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(runData.total_tokens);
         }
@@ -566,35 +566,35 @@ export class TraceDatabase {
         // 并且模型名称需要单独更新，则添加 model_name 到更新字段
         if (runData.model_name !== undefined && runData.outputs === undefined) {
             updateFields.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(runData.model_name);
         }
 
         if (runData.events !== undefined) {
             updateFields.push(
-                `events = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `events = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(JSON.stringify(runData.events));
             // 如果 events 被更新，重新计算并更新 time_to_first_token
             updateFields.push(
                 `time_to_first_token = ${this.adapter.getPlaceholder(
-                    paramIndex++,
-                )}`,
+                    paramIndex++
+                )}`
             );
             updateValues.push(
-                this.extractTimeToFirstTokenFromEvents(runData.events),
+                this.extractTimeToFirstTokenFromEvents(runData.events)
             );
         }
         if (runData.error !== undefined) {
             updateFields.push(
-                `error = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `error = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(JSON.stringify(runData.error));
         }
         if (runData.extra !== undefined) {
             updateFields.push(
-                `extra = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `extra = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(JSON.stringify(runData.extra));
 
@@ -604,8 +604,8 @@ export class TraceDatabase {
                 if (threadId) {
                     updateFields.push(
                         `thread_id = ${this.adapter.getPlaceholder(
-                            paramIndex++,
-                        )}`,
+                            paramIndex++
+                        )}`
                     );
                     updateValues.push(threadId);
                 }
@@ -615,35 +615,35 @@ export class TraceDatabase {
             const userId = this.extractUserIdFromExtra(runData.extra);
             if (userId) {
                 updateFields.push(
-                    `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                    `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`
                 );
                 updateValues.push(userId);
             }
         }
         if (runData.thread_id !== undefined) {
             updateFields.push(
-                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(runData.thread_id);
         }
         if (runData.serialized !== undefined) {
             updateFields.push(
-                `serialized = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `serialized = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(JSON.stringify(runData.serialized));
         }
         if (runData.total_tokens !== undefined) {
             updateFields.push(
-                `total_tokens = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `total_tokens = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(runData.total_tokens);
         }
         if ((runData as any).tags !== undefined) {
             updateFields.push(
-                `tags = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `tags = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(
-                (runData as any).tags ? (runData as any).tags.join(",") : null,
+                (runData as any).tags ? (runData as any).tags.join(",") : null
             );
         }
 
@@ -652,14 +652,14 @@ export class TraceDatabase {
         }
 
         updateFields.push(
-            `updated_at = ${this.adapter.getPlaceholder(paramIndex++)}`,
+            `updated_at = ${this.adapter.getPlaceholder(paramIndex++)}`
         );
         updateValues.push(now);
         updateValues.push(runId); // runId 是 WHERE 子句的最后一个参数
 
         const stmt = await this.adapter.prepare(`
             UPDATE runs SET ${updateFields.join(
-                ", ",
+                ", "
             )} WHERE id = ${this.adapter.getPlaceholder(paramIndex)}
         `);
 
@@ -676,7 +676,7 @@ export class TraceDatabase {
         runId: string,
         field: string,
         value: any,
-        json = true,
+        json = true
     ): Promise<RunRecord | null> {
         const now = new Date().toISOString();
         const jsonValue = json ? JSON.stringify(value) : value;
@@ -684,9 +684,9 @@ export class TraceDatabase {
         // field = $1, updated_at = $2, WHERE id = $3
         const stmt = await this.adapter.prepare(`
             UPDATE runs SET ${field} = ${this.adapter.getPlaceholder(
-            1,
+            1
         )}, updated_at = ${this.adapter.getPlaceholder(
-            2,
+            2
         )} WHERE id = ${this.adapter.getPlaceholder(3)}
         `);
 
@@ -704,7 +704,7 @@ export class TraceDatabase {
             await this.updateRunField(
                 runId,
                 "time_to_first_token",
-                time_to_first_token,
+                time_to_first_token
             );
         }
         if (field === "user_id") {
@@ -720,7 +720,7 @@ export class TraceDatabase {
 
     async getRun(runId: string): Promise<RunRecord | null> {
         const stmt = await this.adapter.prepare(
-            `SELECT * FROM runs WHERE id = ${this.adapter.getPlaceholder(1)}`,
+            `SELECT * FROM runs WHERE id = ${this.adapter.getPlaceholder(1)}`
         );
         const result = (await stmt.get([runId])) as RunRecord;
         return result || null;
@@ -729,7 +729,7 @@ export class TraceDatabase {
     // Feedback 操作
     async createFeedback(
         runId: string,
-        feedbackData: FeedbackPayload,
+        feedbackData: FeedbackPayload
     ): Promise<FeedbackRecord> {
         const id = uuidv4();
         const now = new Date().toISOString();
@@ -751,15 +751,15 @@ export class TraceDatabase {
             INSERT INTO feedback (
                 id, trace_id, run_id, feedback_id, score, comment, metadata, created_at
             ) VALUES (${this.adapter.getPlaceholder(
-                1,
+                1
             )}, ${this.adapter.getPlaceholder(
-            2,
+            2
         )}, ${this.adapter.getPlaceholder(3)}, ${this.adapter.getPlaceholder(
-            4,
+            4
         )}, ${this.adapter.getPlaceholder(5)}, ${this.adapter.getPlaceholder(
-            6,
+            6
         )}, ${this.adapter.getPlaceholder(7)}, ${this.adapter.getPlaceholder(
-            8,
+            8
         )})
         `);
 
@@ -783,7 +783,7 @@ export class TraceDatabase {
         filename: string,
         contentType: string,
         fileSize: number,
-        storagePath: string,
+        storagePath: string
     ): Promise<AttachmentRecord> {
         const id = uuidv4();
         const now = new Date().toISOString();
@@ -802,13 +802,13 @@ export class TraceDatabase {
             INSERT INTO attachments (
                 id, run_id, filename, content_type, file_size, storage_path, created_at
             ) VALUES (${this.adapter.getPlaceholder(
-                1,
+                1
             )}, ${this.adapter.getPlaceholder(
-            2,
+            2
         )}, ${this.adapter.getPlaceholder(3)}, ${this.adapter.getPlaceholder(
-            4,
+            4
         )}, ${this.adapter.getPlaceholder(5)}, ${this.adapter.getPlaceholder(
-            6,
+            6
         )}, ${this.adapter.getPlaceholder(7)})
         `);
 
@@ -829,8 +829,8 @@ export class TraceDatabase {
     async getRunsByTraceId(traceId: string): Promise<RunRecord[]> {
         const stmt = await this.adapter.prepare(
             `SELECT * FROM runs WHERE trace_id = ${this.adapter.getPlaceholder(
-                1,
-            )} ORDER BY created_at`,
+                1
+            )} ORDER BY created_at`
         );
         return (await stmt.all([traceId])) as RunRecord[];
     }
@@ -846,17 +846,17 @@ export class TraceDatabase {
                 ${this.adapter.getStringAggregateFunction(
                     "run_type",
                     true,
-                    ",",
+                    ","
                 )} as run_types,
                 ${this.adapter.getStringAggregateFunction(
                     "system",
                     true,
-                    ",",
+                    ","
                 )} as systems,
                 SUM(total_tokens) as total_tokens_sum
             FROM runs 
             WHERE trace_id IS NOT NULL AND system = ${this.adapter.getPlaceholder(
-                1,
+                1
             )}
             GROUP BY trace_id 
             ORDER BY MAX(created_at) DESC
@@ -869,7 +869,7 @@ export class TraceDatabase {
                 // 获取该 trace 的 feedback 和 attachments 统计
                 const feedbackStmt = await this.adapter.prepare(`
                 SELECT COUNT(*) as count FROM feedback WHERE trace_id = ${this.adapter.getPlaceholder(
-                    1,
+                    1
                 )}
             `);
                 const attachmentStmt = await this.adapter.prepare(`
@@ -901,7 +901,7 @@ export class TraceDatabase {
                         : [],
                     total_tokens_sum: trace.total_tokens_sum || 0,
                 };
-            }),
+            })
         );
     }
 
@@ -909,8 +909,8 @@ export class TraceDatabase {
     async getRunsBySystem(system: string): Promise<RunRecord[]> {
         const stmt = await this.adapter.prepare(
             `SELECT * FROM runs WHERE system = ${this.adapter.getPlaceholder(
-                1,
-            )} ORDER BY created_at DESC`,
+                1
+            )} ORDER BY created_at DESC`
         );
         return (await stmt.all([system])) as RunRecord[];
     }
@@ -919,8 +919,8 @@ export class TraceDatabase {
     async getRunsByThreadId(threadId: string): Promise<RunRecord[]> {
         const stmt = await this.adapter.prepare(
             `SELECT * FROM runs WHERE thread_id = ${this.adapter.getPlaceholder(
-                1,
-            )} ORDER BY created_at DESC`,
+                1
+            )} ORDER BY created_at DESC`
         );
         return (await stmt.all([threadId])) as RunRecord[];
     }
@@ -929,8 +929,8 @@ export class TraceDatabase {
     async getRunsByUserId(userId: string): Promise<RunRecord[]> {
         const stmt = await this.adapter.prepare(
             `SELECT * FROM runs WHERE user_id = ${this.adapter.getPlaceholder(
-                1,
-            )} ORDER BY created_at DESC`,
+                1
+            )} ORDER BY created_at DESC`
         );
         return (await stmt.all([userId])) as RunRecord[];
     }
@@ -946,18 +946,18 @@ export class TraceDatabase {
                 ${this.adapter.getStringAggregateFunction(
                     "run_type",
                     true,
-                    ",",
+                    ","
                 )} as run_types,
                 ${this.adapter.getStringAggregateFunction(
                     "system",
                     true,
-                    ",",
+                    ","
                 )} as systems,
                 SUM(total_tokens) as total_tokens_sum,
                 MIN(user_id) as user_id
             FROM runs 
             WHERE trace_id IS NOT NULL AND thread_id = ${this.adapter.getPlaceholder(
-                1,
+                1
             )}
             GROUP BY trace_id 
             ORDER BY MAX(created_at) DESC
@@ -970,7 +970,7 @@ export class TraceDatabase {
                 // 获取该 trace 的 feedback 和 attachments 统计
                 const feedbackStmt = await this.adapter.prepare(`
                 SELECT COUNT(*) as count FROM feedback WHERE trace_id = ${this.adapter.getPlaceholder(
-                    1,
+                    1
                 )}
             `);
                 const attachmentStmt = await this.adapter.prepare(`
@@ -1003,7 +1003,7 @@ export class TraceDatabase {
                     total_tokens_sum: trace.total_tokens_sum || 0,
                     user_id: trace.user_id,
                 };
-            }),
+            })
         );
     }
 
@@ -1035,14 +1035,14 @@ export class TraceDatabase {
         // 可选过滤条件
         if (filters?.system) {
             whereConditions.push(
-                `system = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `system = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(filters.system);
         }
 
         if (filters?.thread_id) {
             whereConditions.push(
-                `thread_id LIKE ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `thread_id LIKE ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(`%${filters.thread_id}%`);
         }
@@ -1059,12 +1059,12 @@ export class TraceDatabase {
                 ${this.adapter.getStringAggregateFunction(
                     "run_type",
                     true,
-                    ",",
+                    ","
                 )} as run_types,
                 ${this.adapter.getStringAggregateFunction(
                     "system",
                     true,
-                    ",",
+                    ","
                 )} as systems,
                 SUM(total_tokens) as total_tokens_sum
             FROM runs 
@@ -1114,7 +1114,7 @@ export class TraceDatabase {
                         : [],
                     total_tokens_sum: thread.total_tokens_sum || 0,
                 };
-            }),
+            })
         );
     }
 
@@ -1165,17 +1165,17 @@ export class TraceDatabase {
                 ${this.adapter.getStringAggregateFunction(
                     "run_type",
                     true,
-                    ",",
+                    ","
                 )} as run_types,
                 ${this.adapter.getStringAggregateFunction(
                     "system",
                     true,
-                    ",",
+                    ","
                 )} as systems,
                 SUM(total_tokens) as total_tokens_sum
             FROM runs 
             WHERE trace_id IS NOT NULL AND user_id = ${this.adapter.getPlaceholder(
-                1,
+                1
             )}
             GROUP BY trace_id 
             ORDER BY MAX(created_at) DESC
@@ -1188,7 +1188,7 @@ export class TraceDatabase {
                 // 获取该 trace 的 feedback 和 attachments 统计
                 const feedbackStmt = await this.adapter.prepare(`
                 SELECT COUNT(*) as count FROM feedback WHERE trace_id = ${this.adapter.getPlaceholder(
-                    1,
+                    1
                 )}
             `);
                 const attachmentStmt = await this.adapter.prepare(`
@@ -1220,7 +1220,7 @@ export class TraceDatabase {
                         : [],
                     total_tokens_sum: trace.total_tokens_sum || 0,
                 };
-            }),
+            })
         );
     }
 
@@ -1240,14 +1240,14 @@ export class TraceDatabase {
     async getRunsByRunType(
         runType: string,
         limit: number,
-        offset: number,
+        offset: number
     ): Promise<RunRecord[]> {
         const stmt = await this.adapter.prepare(`
             SELECT * FROM runs
             WHERE run_type = ${this.adapter.getPlaceholder(1)}
             ORDER BY created_at DESC
             LIMIT ${this.adapter.getPlaceholder(
-                2,
+                2
             )} OFFSET ${this.adapter.getPlaceholder(3)}
         `);
         return (await stmt.all([runType, limit, offset])) as RunRecord[];
@@ -1275,7 +1275,7 @@ export class TraceDatabase {
             tag?: string;
         },
         limit: number,
-        offset: number,
+        offset: number
     ): Promise<RunRecord[]> {
         const whereConditions: string[] = [];
         const values: any[] = [];
@@ -1283,39 +1283,39 @@ export class TraceDatabase {
 
         if (conditions.run_type) {
             whereConditions.push(
-                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.run_type);
         }
         if (conditions.system) {
             whereConditions.push(
-                `system = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `system = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.system);
         }
         if (conditions.model_name) {
             whereConditions.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.model_name);
         }
         if (conditions.thread_id) {
             whereConditions.push(
-                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.thread_id);
         }
         if (conditions.user_id) {
             whereConditions.push(
-                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.user_id);
         }
         if (conditions.tag) {
             whereConditions.push(
                 `tags IS NOT NULL AND tags LIKE ${this.adapter.getPlaceholder(
-                    paramIndex++,
-                )}`,
+                    paramIndex++
+                )}`
             );
             values.push(`%"${conditions.tag}"%`);
         }
@@ -1352,39 +1352,39 @@ export class TraceDatabase {
 
         if (conditions.user_id) {
             whereConditions.push(
-                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.user_id);
         }
         if (conditions.run_type) {
             whereConditions.push(
-                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.run_type);
         }
         if (conditions.system) {
             whereConditions.push(
-                `system = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `system = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.system);
         }
         if (conditions.model_name) {
             whereConditions.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.model_name);
         }
         if (conditions.thread_id) {
             whereConditions.push(
-                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.thread_id);
         }
         if (conditions.tag) {
             whereConditions.push(
                 `tags IS NOT NULL AND tags LIKE ${this.adapter.getPlaceholder(
-                    paramIndex++,
-                )}`,
+                    paramIndex++
+                )}`
             );
             values.push(`%"${conditions.tag}"%`);
         }
@@ -1413,7 +1413,7 @@ export class TraceDatabase {
             model_name?: string;
         },
         limit: number,
-        offset: number,
+        offset: number
     ): Promise<TraceOverview[]> {
         const whereConditions: string[] = [];
         const values: any[] = [];
@@ -1421,31 +1421,31 @@ export class TraceDatabase {
 
         if (conditions.system) {
             whereConditions.push(
-                `system = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `system = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.system);
         }
         if (conditions.thread_id) {
             whereConditions.push(
-                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.thread_id);
         }
         if (conditions.user_id) {
             whereConditions.push(
-                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.user_id);
         }
         if (conditions.run_type) {
             whereConditions.push(
-                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.run_type);
         }
         if (conditions.model_name) {
             whereConditions.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.model_name);
         }
@@ -1453,7 +1453,7 @@ export class TraceDatabase {
         const whereClause =
             whereConditions.length > 0
                 ? `WHERE trace_id IS NOT NULL AND ${whereConditions.join(
-                      " AND ",
+                      " AND "
                   )}`
                 : "WHERE trace_id IS NOT NULL";
 
@@ -1468,17 +1468,17 @@ export class TraceDatabase {
                 ${this.adapter.getStringAggregateFunction(
                     "run_type",
                     true,
-                    ",",
+                    ","
                 )} as run_types,
                 ${this.adapter.getStringAggregateFunction(
                     "system",
                     true,
-                    ",",
+                    ","
                 )} as systems,
                 ${this.adapter.getStringAggregateFunction(
                     "user_id",
                     true,
-                    ",",
+                    ","
                 )} as user_ids,
                 SUM(total_tokens) as total_tokens_sum
             FROM runs 
@@ -1496,7 +1496,7 @@ export class TraceDatabase {
                 // 获取该 trace 的 feedback 和 attachments 统计
                 const feedbackStmt = await this.adapter.prepare(`
                 SELECT COUNT(*) as count FROM feedback WHERE trace_id = ${this.adapter.getPlaceholder(
-                    1,
+                    1
                 )}
             `);
                 const attachmentStmt = await this.adapter.prepare(`
@@ -1523,25 +1523,23 @@ export class TraceDatabase {
                     run_types: trace.run_types
                         ? Array.from(
                               new Set(
-                                  trace.run_types.split(",").filter(Boolean),
-                              ),
+                                  trace.run_types.split(",").filter(Boolean)
+                              )
                           )
                         : [],
                     systems: trace.systems
                         ? Array.from(
-                              new Set(trace.systems.split(",").filter(Boolean)),
+                              new Set(trace.systems.split(",").filter(Boolean))
                           )
                         : [],
                     user_ids: trace.user_ids
                         ? Array.from(
-                              new Set(
-                                  trace.user_ids.split(",").filter(Boolean),
-                              ),
+                              new Set(trace.user_ids.split(",").filter(Boolean))
                           )
                         : [],
                     total_tokens_sum: trace.total_tokens_sum || 0,
                 };
-            }),
+            })
         );
     }
 
@@ -1559,31 +1557,31 @@ export class TraceDatabase {
 
         if (conditions.system) {
             whereConditions.push(
-                `system = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `system = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.system);
         }
         if (conditions.thread_id) {
             whereConditions.push(
-                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.thread_id);
         }
         if (conditions.user_id) {
             whereConditions.push(
-                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.user_id);
         }
         if (conditions.run_type) {
             whereConditions.push(
-                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.run_type);
         }
         if (conditions.model_name) {
             whereConditions.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             values.push(conditions.model_name);
         }
@@ -1591,7 +1589,7 @@ export class TraceDatabase {
         const whereClause =
             whereConditions.length > 0
                 ? `WHERE trace_id IS NOT NULL AND ${whereConditions.join(
-                      " AND ",
+                      " AND "
                   )}`
                 : "WHERE trace_id IS NOT NULL";
 
@@ -1607,8 +1605,8 @@ export class TraceDatabase {
     async getFeedbackByRunId(runId: string): Promise<FeedbackRecord[]> {
         const stmt = await this.adapter.prepare(
             `SELECT * FROM feedback WHERE run_id = ${this.adapter.getPlaceholder(
-                1,
-            )} ORDER BY created_at`,
+                1
+            )} ORDER BY created_at`
         );
         return (await stmt.all([runId])) as FeedbackRecord[];
     }
@@ -1616,15 +1614,15 @@ export class TraceDatabase {
     async getAttachmentsByRunId(runId: string): Promise<AttachmentRecord[]> {
         const stmt = await this.adapter.prepare(
             `SELECT * FROM attachments WHERE run_id = ${this.adapter.getPlaceholder(
-                1,
-            )} ORDER BY created_at`,
+                1
+            )} ORDER BY created_at`
         );
         return (await stmt.all([runId])) as AttachmentRecord[];
     }
 
     // 事务操作
     async createTransaction<T extends any[], R>(
-        fn: (...args: T) => Promise<R>,
+        fn: (...args: T) => Promise<R>
     ): Promise<(...args: T) => Promise<R>> {
         return await this.adapter.transaction(fn);
     }
@@ -1642,7 +1640,7 @@ export class TraceDatabase {
     async createSystem(
         name: string,
         description?: string,
-        apiKey?: string, // 新增：可选的 API Key 参数
+        apiKey?: string // 新增：可选的 API Key 参数
     ): Promise<SystemRecord> {
         const id = uuidv4();
         const finalApiKey = apiKey || this.generateApiKey(); // 如果提供了 API Key，则使用它，否则生成新的
@@ -1662,13 +1660,13 @@ export class TraceDatabase {
             INSERT INTO systems (
                 id, name, description, api_key, status, created_at, updated_at
             ) VALUES (${this.adapter.getPlaceholder(
-                1,
+                1
             )}, ${this.adapter.getPlaceholder(
-            2,
+            2
         )}, ${this.adapter.getPlaceholder(3)}, ${this.adapter.getPlaceholder(
-            4,
+            4
         )}, ${this.adapter.getPlaceholder(5)}, ${this.adapter.getPlaceholder(
-            6,
+            6
         )}, ${this.adapter.getPlaceholder(7)})
         `);
 
@@ -1688,8 +1686,8 @@ export class TraceDatabase {
     async getSystemByApiKey(apiKey: string): Promise<SystemRecord | null> {
         const stmt = await this.adapter.prepare(
             `SELECT * FROM systems WHERE api_key = ${this.adapter.getPlaceholder(
-                1,
-            )} AND status = 'active'`,
+                1
+            )} AND status = 'active'`
         );
         const result = (await stmt.get([apiKey])) as SystemRecord;
         return result || null;
@@ -1698,8 +1696,8 @@ export class TraceDatabase {
     async getSystemByName(name: string): Promise<SystemRecord | null> {
         const stmt = await this.adapter.prepare(
             `SELECT * FROM systems WHERE name = ${this.adapter.getPlaceholder(
-                1,
-            )}`,
+                1
+            )}`
         );
         const result = (await stmt.get([name])) as SystemRecord;
         return result || null;
@@ -1707,9 +1705,7 @@ export class TraceDatabase {
 
     async getSystemById(id: string): Promise<SystemRecord | null> {
         const stmt = await this.adapter.prepare(
-            `SELECT * FROM systems WHERE id = ${this.adapter.getPlaceholder(
-                1,
-            )}`,
+            `SELECT * FROM systems WHERE id = ${this.adapter.getPlaceholder(1)}`
         );
         const result = (await stmt.get([id])) as SystemRecord;
         return result || null;
@@ -1717,21 +1713,21 @@ export class TraceDatabase {
 
     async getAllSystemRecords(): Promise<SystemRecord[]> {
         const stmt = await this.adapter.prepare(
-            `SELECT * FROM systems ORDER BY created_at DESC`,
+            `SELECT * FROM systems ORDER BY created_at DESC`
         );
         return (await stmt.all()) as SystemRecord[];
     }
 
     async getActiveSystems(): Promise<SystemRecord[]> {
         const stmt = await this.adapter.prepare(
-            `SELECT * FROM systems WHERE status = 'active' ORDER BY created_at DESC`,
+            `SELECT * FROM systems WHERE status = 'active' ORDER BY created_at DESC`
         );
         return (await stmt.all()) as SystemRecord[];
     }
 
     async updateSystemStatus(
         id: string,
-        status: "active" | "inactive",
+        status: "active" | "inactive"
     ): Promise<SystemRecord | null> {
         const now = new Date().toISOString();
 
@@ -1757,7 +1753,7 @@ export class TraceDatabase {
             name?: string;
             description?: string;
             status?: "active" | "inactive";
-        },
+        }
     ): Promise<SystemRecord | null> {
         const now = new Date().toISOString();
         const updateFields: string[] = [];
@@ -1766,19 +1762,19 @@ export class TraceDatabase {
 
         if (updates.name !== undefined) {
             updateFields.push(
-                `name = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `name = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(updates.name);
         }
         if (updates.description !== undefined) {
             updateFields.push(
-                `description = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `description = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(updates.description);
         }
         if (updates.status !== undefined) {
             updateFields.push(
-                `status = ${this.adapter.getPlaceholder(paramIndex++)}`,
+                `status = ${this.adapter.getPlaceholder(paramIndex++)}`
             );
             updateValues.push(updates.status);
         }
@@ -1788,14 +1784,14 @@ export class TraceDatabase {
         }
 
         updateFields.push(
-            `updated_at = ${this.adapter.getPlaceholder(paramIndex++)}`,
+            `updated_at = ${this.adapter.getPlaceholder(paramIndex++)}`
         );
         updateValues.push(now);
         updateValues.push(id); // id 是 WHERE 子句的参数
 
         const stmt = await this.adapter.prepare(`
             UPDATE systems SET ${updateFields.join(
-                ", ",
+                ", "
             )} WHERE id = ${this.adapter.getPlaceholder(paramIndex)}
         `);
 
@@ -1830,7 +1826,7 @@ export class TraceDatabase {
 
     async deleteSystem(id: string): Promise<boolean> {
         const stmt = await this.adapter.prepare(
-            `DELETE FROM systems WHERE id = ${this.adapter.getPlaceholder(1)}`,
+            `DELETE FROM systems WHERE id = ${this.adapter.getPlaceholder(1)}`
         );
         const result = await stmt.run([id]);
         return result.changes > 0;
@@ -1908,7 +1904,7 @@ export class TraceDatabase {
             if (!existingSystem) {
                 await this.createSystem(
                     systemName,
-                    `从现有数据迁移: ${systemName}`,
+                    `从现有数据迁移: ${systemName}`
                 );
                 created++;
             } else {

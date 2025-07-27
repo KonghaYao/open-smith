@@ -7,8 +7,8 @@
         "skipLibCheck": true,
         "resolveJsonModule": true,
         "types": ["node"],
-        "jsx": "react-jsx",
-        "jsxImportSource": "hono/jsx",
+        "jsx": "preserve",
+        "jsxImportSource": "solid-js",
         "outDir": "./dist",
         "declaration": true
     },

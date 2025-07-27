@@ -47,3 +47,4 @@ attachments/
 .env.production
 __pycache__
 .langgraph_api
+.DS_Store
