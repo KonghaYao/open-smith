@@ -1,6 +1,6 @@
 import { ofetch } from "ofetch";
 
 export const fetch = ofetch.create({
-    baseURL: "/api",
+    baseURL: process.env.NODE_ENV === "development" ? "/api" : "../",
 });
 export { fetch as ofetch };

@@ -70,7 +70,7 @@ app.use(logger());
 
 // /v1/metadata/submit 路由已移动到 runs-routes.ts
 
-const uiPath = path.join(__dirname, "../public/");
+const uiPath = path.join(__dirname, "./public/");
 app.use(
     "/ui/*",
     serveStatic({
@@ -78,7 +78,7 @@ app.use(
         getContent: async (path) => {
             return fs.readFileSync(uiPath + path.replace("ui/", ""), "utf-8");
         },
-    }),
+    })
 );
 
 // 挂载 trace 路由器
@@ -226,7 +226,7 @@ app.notFound(async (c) => {
             if (contentType?.includes("application/json")) {
                 const jsonBody = await c.req.json();
                 curlCommand += ` -H 'Content-Type: application/json' -d '${JSON.stringify(
-                    jsonBody,
+                    jsonBody
                 ).replace(/'/g, "'''")}'`;
             } else if (contentType?.includes("multipart/form-data")) {
                 // 对于 multipart/form-data，需要特殊处理，因为FormData()会消耗流
@@ -248,7 +248,7 @@ app.notFound(async (c) => {
     console.log(
         "\n--- Incoming Request as Curl Command ---\n" +
             curlCommand +
-            "\n--------------------------------------\n",
+            "\n--------------------------------------\n"
     );
 
     return c.text("404 Not Found", 404);

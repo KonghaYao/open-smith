@@ -13,7 +13,9 @@
     },
     "scripts": {
         "dev": "bun src/index.ts",
-        "build": "rm -r dist && tsc",
+        "dev:fe": "vite",
+        "build": "tsc --project tsconfig.server.json && vite build",
+        "start": "bun dist/index.js",
         "prepublishOnly": "pnpm build"
     },
     "bin": {
