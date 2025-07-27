@@ -1,15 +1,6 @@
 import { Hono } from "hono";
 import type { TraceDatabase } from "../database.js";
-
-export interface TraceInfo {
-    trace_id: string;
-    total_runs: number;
-    total_feedback: number;
-    total_attachments: number;
-    first_run_time: string;
-    last_run_time: string;
-    runs: any[];
-}
+import type { TraceInfo } from "../types.js";
 
 export function createTraceRouter(db: TraceDatabase) {
     const traceRouter = new Hono();
@@ -30,7 +21,7 @@ export function createTraceRouter(db: TraceDatabase) {
                     message:
                         error instanceof Error ? error.message : String(error),
                 },
-                500,
+                500
             );
         }
     });
@@ -48,7 +39,7 @@ export function createTraceRouter(db: TraceDatabase) {
 
             // 使用统一的查询方法
             const threadOverviews = await db.getThreadOverviews(
-                Object.keys(filters).length > 0 ? filters : undefined,
+                Object.keys(filters).length > 0 ? filters : undefined
             );
 
             return c.json({
@@ -65,7 +56,7 @@ export function createTraceRouter(db: TraceDatabase) {
                     message:
                         error instanceof Error ? error.message : String(error),
                 },
-                500,
+                500
             );
         }
     });
@@ -86,7 +77,7 @@ export function createTraceRouter(db: TraceDatabase) {
                     message:
                         error instanceof Error ? error.message : String(error),
                 },
-                500,
+                500
             );
         }
     });
@@ -107,7 +98,7 @@ export function createTraceRouter(db: TraceDatabase) {
                     message:
                         error instanceof Error ? error.message : String(error),
                 },
-                500,
+                500
             );
         }
     });
@@ -136,7 +127,7 @@ export function createTraceRouter(db: TraceDatabase) {
             const traces = await db.getRunsByConditions(
                 conditions,
                 limit,
-                offset,
+                offset
             );
             const total = await db.countRunsByConditions(conditions);
 
@@ -156,7 +147,7 @@ export function createTraceRouter(db: TraceDatabase) {
                     message:
                         error instanceof Error ? error.message : String(error),
                 },
-                500,
+                500
             );
         }
     });
@@ -183,7 +174,7 @@ export function createTraceRouter(db: TraceDatabase) {
             const traces = await db.getTracesByConditions(
                 conditions,
                 limit,
-                offset,
+                offset
             );
             const total = await db.countTracesByConditions(conditions);
 
@@ -207,7 +198,7 @@ export function createTraceRouter(db: TraceDatabase) {
                     message:
                         error instanceof Error ? error.message : String(error),
                 },
-                500,
+                500
             );
         }
     });
@@ -230,7 +221,7 @@ export function createTraceRouter(db: TraceDatabase) {
                     success: false,
                     error: "Invalid type parameter. Must be 'traces' or 'runs'",
                 },
-                400,
+                400
             );
         }
 
@@ -249,7 +240,7 @@ export function createTraceRouter(db: TraceDatabase) {
                 data = await db.getTracesByConditions(
                     conditions,
                     limit,
-                    offset,
+                    offset
                 );
                 total = await db.countTracesByConditions(conditions);
             } else {
@@ -275,7 +266,7 @@ export function createTraceRouter(db: TraceDatabase) {
                     message:
                         error instanceof Error ? error.message : String(error),
                 },
-                500,
+                500
             );
         }
     });
@@ -294,7 +285,7 @@ export function createTraceRouter(db: TraceDatabase) {
         } catch (error) {
             console.error(
                 `Error fetching traces for system ${c.req.param("system")}:`,
-                error,
+                error
             );
             return c.json(
                 {
@@ -302,7 +293,7 @@ export function createTraceRouter(db: TraceDatabase) {
                     message:
                         error instanceof Error ? error.message : String(error),
                 },
-                500,
+                500
             );
         }
     });
@@ -321,7 +312,7 @@ export function createTraceRouter(db: TraceDatabase) {
         } catch (error) {
             console.error(
                 `Error fetching runs for thread ${c.req.param("threadId")}:`,
-                error,
+                error
             );
             return c.json(
                 {
@@ -329,7 +320,7 @@ export function createTraceRouter(db: TraceDatabase) {
                     message:
                         error instanceof Error ? error.message : String(error),
                 },
-                500,
+                500
             );
         }
     });
@@ -360,7 +351,7 @@ export function createTraceRouter(db: TraceDatabase) {
                     message:
                         error instanceof Error ? error.message : String(error),
                 },
-                500,
+                500
             );
         }
     });
@@ -393,7 +384,7 @@ export function createTraceRouter(db: TraceDatabase) {
                         feedback: feedback,
                         attachments: attachments,
                     };
-                }),
+                })
             );
 
             const traceInfo: TraceInfo = {
@@ -415,7 +406,7 @@ export function createTraceRouter(db: TraceDatabase) {
                     message:
                         error instanceof Error ? error.message : String(error),
                 },
-                500,
+                500
             );
         }
     });
@@ -450,7 +441,7 @@ export function createTraceRouter(db: TraceDatabase) {
                         feedback_count: feedback.length,
                         attachments_count: attachments.length,
                     };
-                }),
+                })
             );
 
             const summary = {
@@ -472,7 +463,7 @@ export function createTraceRouter(db: TraceDatabase) {
                     message:
                         error instanceof Error ? error.message : String(error),
                 },
-                500,
+                500
             );
         }
     });
@@ -528,11 +519,11 @@ export function createTraceRouter(db: TraceDatabase) {
                     span_hours:
                         Math.round(
                             ((new Date(
-                                runs[runs.length - 1].created_at,
+                                runs[runs.length - 1].created_at
                             ).getTime() -
                                 new Date(runs[0].created_at).getTime()) /
                                 (1000 * 60 * 60)) *
-                                100,
+                                100
                         ) / 100,
                 },
             };
@@ -546,7 +537,7 @@ export function createTraceRouter(db: TraceDatabase) {
                     message:
                         error instanceof Error ? error.message : String(error),
                 },
-                500,
+                500
             );
         }
     });

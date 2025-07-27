@@ -1,12 +1,12 @@
 import { RunItem } from "./RunItem.jsx";
 import { createMemo, createSignal, type Accessor } from "solid-js";
 import { RefreshCcw } from "lucide-solid";
-import type { RunRecord } from "../../../src/database.js";
+import type { RunRecord, TraceInfo } from "../../../src/types.js";
 
 interface RunsListProps {
     selectedTraceId: Accessor<string | null>;
     selectedRunId: Accessor<string | null>;
-    currentTraceData: Accessor<any | null>;
+    currentTraceData: Accessor<TraceInfo | null>;
     onRunSelect: (runId: string) => void;
     onLoadTrace: () => void;
     refresh: () => void;
@@ -51,8 +51,8 @@ export const RunsList = (props: RunsListProps) => {
 
     const totalDuration = createMemo(() => {
         return (
-            new Date(props.currentTraceData()?.last_run_time).getTime() -
-            new Date(props.currentTraceData()?.first_run_time).getTime()
+            new Date(props.currentTraceData()?.last_run_time || "").getTime() -
+            new Date(props.currentTraceData()?.first_run_time || "").getTime()
         );
     });
 

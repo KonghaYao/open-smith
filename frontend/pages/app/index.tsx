@@ -4,6 +4,7 @@ import { RunsList } from "./RunsList.jsx";
 import { RunDetails } from "./RunDetails.jsx";
 import { createStoreSignal } from "../../utils.jsx";
 import { ofetch } from "../../api.js";
+import type { TraceInfo, TraceOverview } from "../../../src/types.js";
 // 主 App 组件
 export const App = () => {
     // 状态
@@ -45,7 +46,7 @@ export const App = () => {
                 queryParams.append("thread_id", params.search.trim());
             }
 
-            const response = await ofetch(
+            const response = await ofetch<{ threads: TraceOverview[] }>(
                 `/trace/threads/overview?${queryParams.toString()}`
             );
             return response.threads || [];
@@ -58,7 +59,7 @@ export const App = () => {
         async (params) => {
             if (!params.threadId) return [];
             // 使用新的搜索接口
-            const response = await ofetch(
+            const response = await ofetch<{ data: TraceOverview[] }>(
                 `/trace/search/traces?thread_id=${encodeURIComponent(
                     params.threadId
                 )}`
@@ -72,7 +73,9 @@ export const App = () => {
         () => ({ traceId: selectedTraceId(), refresh: refreshTrigger() }), // 依赖 refreshTrigger 触发刷新
         async (params) => {
             if (!params.traceId) return null;
-            const response = await ofetch(`/trace/${params.traceId}`);
+            const response = await ofetch<TraceInfo>(
+                `/trace/${params.traceId}`
+            );
             return response;
         }
     );
@@ -97,7 +100,7 @@ export const App = () => {
         <div class="three-column h-screen flex flex-row bg-white overflow-hidden">
             <TraceList
                 threads={allThreads}
-                traces={threadTraces}
+                traces={() => threadTraces() || []}
                 selectedThreadId={selectedThreadId}
                 selectedTraceId={selectedTraceId}
                 selectedSystem={selectedSystem}
@@ -107,14 +110,13 @@ export const App = () => {
                 onSystemChange={setSelectedSystem}
                 onSearchChange={setSearchQuery}
                 onLoadThreads={refetchThreads}
-                onLoadTraces={refetchThreadTraces}
                 refresh={refresh}
                 refreshTrigger={refreshTrigger}
             />
             <RunsList
                 selectedTraceId={selectedTraceId}
                 selectedRunId={selectedRunId}
-                currentTraceData={currentTraceData}
+                currentTraceData={() => currentTraceData() || null}
                 onRunSelect={handleRunSelect}
                 onLoadTrace={refetchTraceData}
                 refresh={refresh}
@@ -122,7 +124,7 @@ export const App = () => {
             />
             <RunDetails
                 selectedRunId={selectedRunId}
-                currentTraceData={currentTraceData}
+                currentTraceData={() => currentTraceData() || null}
                 refresh={refresh}
                 refreshTrigger={refreshTrigger}
             />

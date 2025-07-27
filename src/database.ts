@@ -1,79 +1,18 @@
 import { v4 as uuidv4 } from "uuid";
 import type { RunPayload, FeedbackPayload } from "./multipart-types.js";
-
+import type {
+    TraceOverview,
+    SystemRecord,
+    RunRecord,
+    FeedbackRecord,
+    AttachmentRecord,
+} from "./types.js";
 const formatTimestamp = (time: string | void) => {
     if (time) {
         return new Date(time).getTime().toFixed(0);
     }
     return;
 };
-
-export interface RunRecord {
-    id: string;
-    trace_id?: string;
-    name: string;
-    run_type?: string;
-    system?: string; // 系统标识，来自 x-api-key
-    thread_id?: string; // 线程ID，来自 extra.metadata.thread_id
-    user_id?: string; // 用户ID，来自 extra.metadata.user_id
-    start_time: string;
-    end_time: string;
-    inputs?: string; // JSON string
-    outputs?: string; // JSON string
-    events?: string; // JSON string
-    error?: string; // JSON string
-    extra?: string; // JSON string
-    serialized?: string; // JSON string
-    total_tokens?: number; // 新增字段：总 token 数
-    model_name?: string; // 新增字段：模型名称
-    time_to_first_token?: number; // 新增字段：首个 token 时间
-    tags?: string; // 新增字段：标签数组，存储为JSON字符串
-    created_at: string;
-    updated_at: string;
-}
-
-export interface FeedbackRecord {
-    id: string;
-    trace_id: string;
-    run_id: string;
-    feedback_id?: string;
-    score?: number;
-    comment?: string;
-    metadata?: string; // JSON string
-    created_at: string;
-}
-
-export interface AttachmentRecord {
-    id: string;
-    run_id: string;
-    filename: string;
-    content_type: string;
-    file_size: number;
-    storage_path: string;
-    created_at: string;
-}
-
-export interface SystemRecord {
-    id: string;
-    name: string; // 系统名称，与runs表的system字段关联
-    description?: string; // 系统描述
-    api_key: string; // API密钥
-    status: "active" | "inactive"; // 系统状态
-    created_at: string;
-    updated_at: string;
-}
-
-export interface TraceOverview {
-    trace_id: string;
-    total_runs: number;
-    total_feedback: number;
-    total_attachments: number;
-    first_run_time: string;
-    last_run_time: string;
-    run_types: string[];
-    systems: string[]; // 涉及的系统列表
-    total_tokens_sum?: number; // 新增：总 token 消耗量
-}
 
 // 数据库适配器接口
 export interface DatabaseAdapter {
@@ -443,6 +382,10 @@ export class TraceDatabase {
             tags: (runData as any).tags
                 ? (runData as any).tags.join(",")
                 : undefined,
+            feedback_count: 0,
+            attachments_count: 0,
+            feedback: [],
+            attachments: [],
         };
         const commitData = [
             record.id,
@@ -1011,20 +954,7 @@ export class TraceDatabase {
     async getThreadOverviews(filters?: {
         system?: string;
         thread_id?: string;
-    }): Promise<
-        Array<{
-            thread_id: string;
-            total_runs: number;
-            total_traces: number;
-            total_feedback: number;
-            total_attachments: number;
-            first_run_time: string;
-            last_run_time: string;
-            run_types: string[];
-            systems: string[];
-            total_tokens_sum: number;
-        }>
-    > {
+    }): Promise<Array<TraceOverview>> {
         const whereConditions: string[] = [];
         const values: any[] = [];
         let paramIndex = 1;
@@ -1100,6 +1030,7 @@ export class TraceDatabase {
 
                 return {
                     thread_id: thread.thread_id,
+                    trace_id: thread.trace_id,
                     total_runs: thread.total_runs,
                     total_traces: thread.total_traces,
                     total_feedback: feedbackCount.count,

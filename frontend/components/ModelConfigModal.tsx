@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from "solid-js";
-import html from "solid-js/html";
+
 import { createStoreSignal } from "../utils.jsx";
 import {
     Database,
@@ -52,13 +52,11 @@ const ConfigItem = (props: {
                         {Show({
                             when:
                                 props.selectedConfigId?.() === props.config.id,
-                            children: html`
-                                <span
-                                    class="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full"
-                                >
+                            children: (
+                                <span class="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
                                     当前使用
                                 </span>
-                            `,
+                            ),
                         })}
                     </div>
                     <div class="text-sm text-gray-600 space-y-1">

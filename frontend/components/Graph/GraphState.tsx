@@ -271,8 +271,8 @@ const ContentViewer = (props: { content: any }) => {
 
 export const JSONViewer = (props: { data: any }) => {
     return (
-        <div
-            innerHTML={`<andypf-json-viewer
+        /** @ts-ignore */
+        <andypf-json-viewer
             indent="4"
             expanded="4"
             theme="default-light"
@@ -281,6 +281,8 @@ export const JSONViewer = (props: { data: any }) => {
             expand-icon-type="circle"
             show-copy="true"
             show-size="true"
-            data=${JSON.stringify(props.data)}></andypf-json-viewer>`}></div>
+            data={JSON.stringify(props.data)}>
+            {/* @ts-ignore */}
+        </andypf-json-viewer>
     );
 };

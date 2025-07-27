@@ -1,10 +1,10 @@
 import { type Accessor } from "solid-js";
 import { TimeAgo } from "../../components/TimeAgo.jsx";
-import type { TraceOverview } from "../../../src/database.js";
+import type { TraceOverview } from "../../../src/types.js";
 
 export const TracesSimpleList = (props: {
-    filteredTraces: Accessor<TraceOverview[]>;
-    traces: Accessor<TraceOverview[]>;
+    filteredTraces: () => TraceOverview[];
+    traces: () => TraceOverview[];
     onTraceSelect: (traceId: string) => void;
     selectedTraceId: Accessor<string | null>;
 }) => {

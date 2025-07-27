@@ -1,4 +1,4 @@
-import type { RunRecord } from "../../../src/database.js";
+import type { RunRecord } from "../../../src/types.js";
 import { getRunType, getMetaDataOfRun, icon } from "../../utils.js";
 import { createMemo } from "solid-js";
 
@@ -45,7 +45,7 @@ export const RunItem = (props: {
                     }px`,
                 }}>
                 <div class="text-gray-400 text-left">
-                    {icon[getRunType(props.run)] ?? icon.unknown}
+                    {(icon[getRunType(props.run)] ?? icon.unknown)()}
                 </div>
                 <div
                     class={`px-2 font-medium ${

@@ -1,9 +1,14 @@
-import { createMemo, type Accessor, type Setter } from "solid-js";
+import {
+    createMemo,
+    type Accessor,
+    type Resource,
+    type Setter,
+} from "solid-js";
 import { SearchBar } from "./SearchBar.jsx";
-import { ThreadList } from "../../components/ThreadList.js";
+import { ThreadList } from "./ThreadList.js";
 import { TracesSimpleList } from "./TracesSimpleList.jsx";
 import { RefreshCcw } from "lucide-solid";
-import type { TraceOverview } from "../../../src/database.js";
+import type { TraceOverview } from "../../../src/types.js";
 
 export const Statistics = (props: {
     filteredThreads: Accessor<any[]>;
@@ -35,18 +40,17 @@ export const Statistics = (props: {
 };
 // 定义 TraceList, RunsList, RunDetails 的 props 类型
 interface TraceListProps {
-    threads: Accessor<any[] | undefined>;
-    traces: Accessor<TraceOverview[]>;
+    threads: Resource<TraceOverview[]>;
+    traces: () => TraceOverview[];
     selectedThreadId: Accessor<string | null>;
     selectedTraceId: Accessor<string | null>;
     selectedSystem: Accessor<string>;
     searchQuery: Accessor<string>;
     onThreadSelect: (threadId: string) => void;
     onTraceSelect: (traceId: string) => void;
-    onSystemChange: Setter<string>;
-    onSearchChange: Setter<string>;
+    onSystemChange: (system: string) => void;
+    onSearchChange: (query: string) => void;
     onLoadThreads: () => void;
-    onLoadTraces: () => void;
     refresh: () => void;
     refreshTrigger: Accessor<number>;
 }
@@ -99,7 +103,6 @@ export const TraceList = (props: TraceListProps) => {
                             filteredTraces={filteredTraces}
                             selectedTraceId={props.selectedTraceId}
                             onTraceSelect={props.onTraceSelect}
-                            onLoadTraces={props.onLoadTraces}
                         />
                     ) : null}
                 </div>

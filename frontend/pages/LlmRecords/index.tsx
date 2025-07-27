@@ -155,7 +155,10 @@ const columnsConfig: ColumnConfig[] = [
         key: ["start_time", "end_time"],
         format: (run: RunData) => (
             <span class="text-sm font-mono text-gray-700">
-                {formatDuration(run.start_time, run.end_time)}
+                {formatDuration(
+                    run.start_time.toString(),
+                    run.end_time.toString()
+                )}
             </span>
         ),
         className: "px-4 py-3 border-b border-gray-100 text-center",
@@ -185,7 +188,7 @@ const columnsConfig: ColumnConfig[] = [
         key: "start_time",
         format: (run: RunData) => (
             <span class="text-sm text-gray-600">
-                {formatUnixTimestamp(run.start_time)}
+                {formatUnixTimestamp(run.start_time.toString())}
             </span>
         ),
         className: "px-4 py-3 border-b border-gray-100",

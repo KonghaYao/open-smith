@@ -1,6 +1,8 @@
 import { createMemo, createSignal } from "solid-js";
+import type { RunRecord } from "../src/types.js";
+import { Waypoints, Orbit, Wrench, MessageSquare, Link } from "lucide-solid";
 // 格式化日期时间
-export const formatDateTime = (dateString: string) => {
+export const formatDateTime = (dateString?: string) => {
     if (!dateString) return "";
     const date = new Date(dateString);
     return date.toLocaleString("zh-CN", {
@@ -69,8 +71,6 @@ export const createStoreSignal = <T extends keyof UserStoreType>(
         (v: UserStoreType[T]) => patchUserStore({ [key]: v }),
     ] as const;
 };
-import type { RunRecord } from "../src/database.js";
-import { Waypoints, Orbit, Wrench, MessageSquare, Link } from "lucide-solid";
 
 const commonClass =
     "w-6 h-6 rounded-lg flex items-center justify-center text-white p-1";
@@ -139,7 +139,8 @@ export const formatTimestamp = (timestamp: string) => {
 };
 
 const specialName = Object.keys(icon);
-export const getRunType = (run: RunRecord): keyof typeof icon => {
+export const getRunType = (run?: RunRecord): keyof typeof icon => {
+    if (!run) return "unknown";
     if (specialName.includes(run.name!)) {
         return run.name as keyof typeof icon;
     }
