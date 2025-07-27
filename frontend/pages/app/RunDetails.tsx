@@ -149,7 +149,7 @@ export const RunDetails = (props: RunDetailsProps) => {
                             <IOTab run={selectedRunData()!} />
                         ) : null}
                         {activeTab() === "events" ? (
-                            <EventsTab run={selectedRunData()} />
+                            <EventsTab run={selectedRunData()!} />
                         ) : null}
                         {activeTab() === "metadata" ? (
                             <MetadataTab extraData={extraData()} />

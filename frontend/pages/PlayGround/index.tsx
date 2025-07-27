@@ -8,28 +8,14 @@ import {
     createTemplate,
     extractAllVariables,
     replaceVariables,
+    type MessagesTemplate,
+    type ModelConfig,
 } from "../../types.js";
 import { ofetch } from "../../api.js";
 
-// 定义消息模板类型
-interface MessageTemplate {
-    type: string;
-    content: string;
-}
-
-// 定义模型配置类型
-interface ModelConfig {
-    id: string;
-    name: string;
-    provider: string;
-    model_name: string;
-    api_key?: string;
-    // 其他可能的配置属性
-}
-
 // 定义请求负载类型
 interface RequestPayload {
-    messages: MessageTemplate[];
+    messages: MessagesTemplate[];
     inputs: Record<string, string>;
     model: ModelConfig;
     tools: any[]; // 暂时设为 any[]，如果需要可以细化
@@ -38,7 +24,7 @@ interface RequestPayload {
 }
 
 // 默认消息 - 使用新的 Template 格式
-const [defaultMessage, setDefaultMessage] = createSignal<MessageTemplate[]>([
+const [defaultMessage, setDefaultMessage] = createSignal<MessagesTemplate[]>([
     createTemplate("system", "You are a chatbot."),
     createTemplate("human", "{{question}}"),
 ]);
@@ -46,15 +32,16 @@ export { setDefaultMessage };
 
 export const PlayGround = () => {
     // 状态管理
-    const [messages, setMessages] = createSignal<MessageTemplate[]>(
+    const [messages, setMessages] = createSignal<MessagesTemplate[]>(
         defaultMessage()
     );
     const [inputs, setInputs] = createSignal<Record<string, string>>({});
 
-    const [modelConfigs] = createStoreSignal<ModelConfig[]>("modelConfigs", []);
-    const [selectedModelId, setSelectedModelId] = createStoreSignal<
-        string | null
-    >("selectedModelId", null);
+    const [modelConfigs] = createStoreSignal("modelConfigs", []);
+    const [selectedModelId, setSelectedModelId] = createStoreSignal(
+        "selectedModelId",
+        undefined
+    );
     const selectedConfig = createMemo(() => {
         return modelConfigs().find(
             (c: ModelConfig) => c.id === selectedModelId()
@@ -150,6 +137,7 @@ export const PlayGround = () => {
 
                 try {
                     await response
+                        /** @ts-ignore */
                         .pipeThrough(new TextDecoderStream())
                         .pipeTo(writableStream);
                 } catch (error) {
@@ -179,7 +167,7 @@ export const PlayGround = () => {
 
     // 添加消息
     const addMessage = () => {
-        setMessages((prev) => [...prev, createTemplate("user", "")]);
+        setMessages((prev) => [...prev, createTemplate("human", "")]);
     };
 
     // 删除消息
@@ -188,7 +176,7 @@ export const PlayGround = () => {
     };
 
     // 更新消息
-    const updateMessage = (index: number, newTemplate: MessageTemplate) => {
+    const updateMessage = (index: number, newTemplate: MessagesTemplate) => {
         setMessages((prev) =>
             prev.map((template, i) => (i === index ? newTemplate : template))
         );
@@ -273,7 +261,7 @@ export const PlayGround = () => {
                     <div class="flex-1 flex flex-col min-h-0">
                         <div class="flex-1 overflow-y-auto space-y-3 pr-2">
                             <MessageEditor
-                                messages={messages}
+                                messages={messages()}
                                 onUpdateMessage={updateMessage}
                                 onRemoveMessage={removeMessage}
                             />
@@ -405,7 +393,7 @@ export const PlayGround = () => {
                         </h2>
                         <div class="space-y-3">
                             <For each={variables()}>
-                                {(variable) => (
+                                {(variable: any) => (
                                     <div>
                                         <label class="text-sm font-medium text-gray-700">
                                             {variable}

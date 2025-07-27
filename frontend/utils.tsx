@@ -1,6 +1,7 @@
 import { createMemo, createSignal } from "solid-js";
 import type { RunRecord } from "../src/types.js";
 import { Waypoints, Orbit, Wrench, MessageSquare, Link } from "lucide-solid";
+import type { ModelConfig } from "./types.js";
 // 格式化日期时间
 export const formatDateTime = (dateString?: string) => {
     if (!dateString) return "";
@@ -43,7 +44,7 @@ export interface UserStoreType {
     outputReverse: boolean;
     inputReverse: boolean;
     selectedModelId?: string;
-    modelConfigs: any[];
+    modelConfigs: ModelConfig[];
     errors: Record<string, string>;
 }
 

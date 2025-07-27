@@ -1,6 +1,6 @@
 import { formatFileSize } from "../../utils.js";
 import { formatDuration } from "../../utils.js";
-import type { RunRecord } from "../../../src/database.js";
+import type { RunRecord } from "../../../src/types.js";
 
 // 统计信息组件
 export const StatsCard = (props: { run: RunRecord }) => {

@@ -3,12 +3,10 @@ import "@unocss/reset/tailwind.css";
 import "@andypf/json-viewer/dist/iife/index.js";
 import "./index.css";
 import { render } from "solid-js/web";
-import { App } from "./pages/app/index.jsx";
+
 import { HashRouter, Route } from "@solidjs/router"; // 导入 Routes
 import { Layout } from "./Layout.js";
-import { LlmRecords } from "./pages/LlmRecords/index.jsx";
-import { SystemsPage } from "./pages/SystemsPage.jsx";
-import { PlayGround } from "./pages/PlayGround/index.jsx";
+import { lazy } from "solid-js";
 // 渲染应用
 render(() => {
     return HashRouter({
@@ -19,19 +17,35 @@ render(() => {
             children: [
                 Route({
                     path: "/",
-                    component: App, // 将 App 包裹在 Layout 中
+                    component: lazy(() =>
+                        import("./pages/app/index.jsx").then((res) => {
+                            return { default: res.App };
+                        })
+                    ),
                 }),
                 Route({
                     path: "/llm-records",
-                    component: LlmRecords, // 将 OverviewPage 包裹在 Layout 中
+                    component: lazy(() =>
+                        import("./pages/LlmRecords/index.jsx").then((res) => {
+                            return { default: res.LlmRecords };
+                        })
+                    ),
                 }),
                 Route({
                     path: "/systems",
-                    component: SystemsPage, // 将 SystemsPage selectedConfig包裹在 Layout 中
+                    component: lazy(() =>
+                        import("./pages/SystemsPage.jsx").then((res) => {
+                            return { default: res.SystemsPage };
+                        })
+                    ),
                 }),
                 Route({
                     path: "/playground",
-                    component: PlayGround, // 将 PlayGround 包裹在 Layout 中
+                    component: lazy(() =>
+                        import("./pages/PlayGround/index.jsx").then((res) => {
+                            return { default: res.PlayGround };
+                        })
+                    ),
                 }),
             ],
         }),

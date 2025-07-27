@@ -1,25 +1,40 @@
 import { z } from "zod";
 import { Hono } from "hono";
 import { ChatOpenAI } from "@langchain/openai";
-import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { tool } from "@langchain/core/tools";
 import {
     createChatTemplate,
     messagesToTemplate,
 } from "../utils/ChatTemplate.js";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import type { BaseMessage } from "@langchain/core/messages";
 
 const llmRouter = new Hono();
 
+const contentSchema = z.union([
+    z.string(),
+    z.array(
+        z.object({
+            type: z.string(),
+            text: z.string().optional(),
+            image_url: z.object({ url: z.string() }).optional(),
+        })
+    ),
+]);
 // 更新 messageTemplateSchema 以支持 Template 接口和数组 content
 const messageTemplateSchema = z.object({
-    role: z.enum(["system", "human", "ai", "user", "tool"]),
-    content: z.union([z.string(), z.array(z.any())]),
+    role: z.enum(["system", "human", "ai", "tool"]),
+    content: contentSchema,
     tool_calls: z.array(z.any()).optional().default([]),
     tool_call_id: z.string().optional().default(""),
     invalid_tool_calls: z.array(z.any()).optional().default([]),
 });
 
+export type MessagesTemplate = z.infer<typeof messageTemplateSchema>;
+
 const modelSchema = z.object({
+    id: z.string().optional(),
+    name: z.string().optional(),
     model_name: z.string(),
     provider_key: z.string(),
     provider_url: z.string(),
@@ -27,6 +42,8 @@ const modelSchema = z.object({
     top_p: z.number().min(0).max(1).optional(),
     max_tokens: z.number().int().positive().optional(),
 });
+
+export type ModelConfig = z.infer<typeof modelSchema>;
 
 const playgroundSchema = z.object({
     messages: z.array(messageTemplateSchema),
@@ -38,7 +55,7 @@ const playgroundSchema = z.object({
                 name: z.string(),
                 description: z.string(),
                 schema: z.record(z.any()), // JSON Schema 对象
-            }),
+            })
         )
         .optional(),
     output_schema: z.record(z.any()).optional(), // JSON Schema 对象
@@ -54,10 +71,10 @@ async function createChain(body: any) {
         Object.entries(modelParams).map(([key, value]) => [
             key.replace(/_([a-z])/g, (g) => g[1].toUpperCase()),
             value,
-        ]),
+        ])
     );
 
-    const chat = new ChatOpenAI({
+    let chat = new ChatOpenAI({
         modelName: model_name,
         temperature: 0,
         ...camelCaseParams,
@@ -82,12 +99,16 @@ async function createChain(body: any) {
                     name: i.name,
                     description: i.description,
                     schema: i.schema, // i.schema 已经是 JSON Schema 格式
-                }),
-            ),
+                })
+            )
         );
     }
 
-    return { messages, inputs, chat };
+    return {
+        messages: messages as unknown as BaseMessage[],
+        inputs,
+        chat: finalModel as BaseChatModel,
+    };
 }
 
 llmRouter.post("/invoke", async (c) => {
@@ -112,7 +133,7 @@ llmRouter.post("/stream", async (c) => {
         const body = await c.req.json();
         const { messages, chat } = await createChain(body);
 
-        // Enable streaming for the chat model
+        /** @ts-ignore */
         chat.streaming = true;
 
         const stream = await chat.stream(messages);
@@ -126,7 +147,7 @@ llmRouter.post("/stream", async (c) => {
                         for await (const chunk of stream) {
                             const data = JSON.stringify(chunk);
                             controller.enqueue(
-                                encoder.encode(`data: ${data}\n\n`),
+                                encoder.encode(`data: ${data}\n\n`)
                             );
                         }
                         controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
@@ -136,7 +157,7 @@ llmRouter.post("/stream", async (c) => {
                             error: "Stream error occurred",
                         });
                         controller.enqueue(
-                            encoder.encode(`data: ${errorData}\n\n`),
+                            encoder.encode(`data: ${errorData}\n\n`)
                         );
                     } finally {
                         controller.close();
@@ -151,7 +172,7 @@ llmRouter.post("/stream", async (c) => {
                     "Access-Control-Allow-Origin": "*",
                     "Access-Control-Allow-Headers": "Content-Type",
                 },
-            },
+            }
         );
     } catch (error) {
         if (error instanceof z.ZodError) {

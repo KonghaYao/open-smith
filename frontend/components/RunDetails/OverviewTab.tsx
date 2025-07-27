@@ -1,6 +1,6 @@
 import { formatTimestamp } from "../../utils.js";
 import { StatsCard } from "./StatsCard.js";
-import type { RunRecord } from "../../../src/database.js";
+import type { RunRecord } from "../../../src/types.js";
 
 // 概览标签页组件
 export const OverviewTab = (props: { run: RunRecord }) => {

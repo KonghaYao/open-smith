@@ -1,6 +1,6 @@
 import { createSignal, For, Show } from "solid-js";
 
-import { createStoreSignal } from "../utils.jsx";
+import { createStoreSignal } from "../utils.js";
 import {
     Database,
     Pencil,
@@ -9,10 +9,51 @@ import {
     X,
     Settings,
     ArrowLeft,
+    Copy,
 } from "lucide-solid";
+import type { ModelConfig } from "../types.js";
+
+interface InputFieldProps {
+    label: string;
+    name: string;
+    type?: string;
+    value: string | number | undefined;
+    placeholder?: string;
+    required?: boolean;
+    min?: number;
+    max?: number;
+    step?: number;
+    error?: string;
+}
+
+interface ConfigItemProps {
+    config: ModelConfig;
+    selectedConfigId: () => string | undefined | null;
+    onSelect: (config: ModelConfig) => void;
+    onEdit: (config: ModelConfig) => void;
+    onDelete: (configId: string) => void;
+    onCopy: (config: ModelConfig) => void;
+}
+
+interface ConfigListProps {
+    configs: ModelConfig[];
+    selectedConfigId: () => string | undefined | null;
+    onSelect: (config: ModelConfig) => void;
+    onEdit: (config: ModelConfig) => void;
+    onDelete: (configId: string) => void;
+    onNew: () => void;
+    onCopy: (config: ModelConfig) => void;
+}
+
+interface ConfigEditFormProps {
+    config: () => ModelConfig | null;
+    errors: () => { [key: string]: string };
+    onSave: (config: ModelConfig) => void;
+    onCancel: () => void;
+}
 
 // 默认模型配置
-const defaultModelConfig = {
+const defaultModelConfig: ModelConfig = {
     id: "",
     name: "",
     model_name: "gpt-3.5-turbo",
@@ -34,13 +75,7 @@ const EmptyConfigState = () => (
 );
 
 // 单个配置项组件
-const ConfigItem = (props: {
-    config: any;
-    selectedConfigId: any;
-    onSelect: (config: any) => void;
-    onEdit: (config: any) => void;
-    onDelete: (configId: string) => void;
-}) => {
+const ConfigItem = (props: ConfigItemProps) => {
     return (
         <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
             <div class="flex items-center justify-between">
@@ -50,8 +85,7 @@ const ConfigItem = (props: {
                             {props.config.name}
                         </h4>
                         {Show({
-                            when:
-                                props.selectedConfigId?.() === props.config.id,
+                            when: props.selectedConfigId() === props.config.id,
                             children: (
                                 <span class="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
                                     当前使用
@@ -71,18 +105,24 @@ const ConfigItem = (props: {
                 </div>
                 <div class="flex items-center space-x-2 ml-4">
                     <button
-                        onclick={() => props.onSelect?.(props.config)}
+                        onclick={() => props.onSelect(props.config)}
                         class="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition-colors text-sm">
                         选择
                     </button>
                     <button
-                        onclick={() => props.onEdit?.(props.config)}
+                        onclick={() => props.onEdit(props.config)}
                         class="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                         title="编辑">
                         <Pencil />
                     </button>
                     <button
-                        onclick={() => props.onDelete?.(props.config.id)}
+                        onclick={() => props.onCopy(props.config)}
+                        class="p-2 text-gray-600 hover:bg-gray-50 rounded transition-colors"
+                        title="复制">
+                        <Copy />
+                    </button>
+                    <button
+                        onclick={() => props.onDelete(props.config.id!)}
                         class="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
                         title="删除">
                         <Trash2 />
@@ -94,14 +134,7 @@ const ConfigItem = (props: {
 };
 
 // 配置列表组件
-const ConfigList = (props: {
-    configs: any[];
-    selectedConfigId: any;
-    onSelect: (config: any) => void;
-    onEdit: (config: any) => void;
-    onDelete: (configId: string) => void;
-    onNew: () => void;
-}) => {
+const ConfigList = (props: ConfigListProps) => {
     return (
         <div class="mb-6">
             <div class="flex items-center justify-between mb-4">
@@ -120,13 +153,14 @@ const ConfigList = (props: {
                 <EmptyConfigState />
             ) : (
                 <div class="grid gap-4">
-                    {props.configs.map((config: any) => (
+                    {props.configs.map((config: ModelConfig) => (
                         <ConfigItem
                             config={config}
                             selectedConfigId={props.selectedConfigId}
                             onSelect={props.onSelect}
                             onEdit={props.onEdit}
                             onDelete={props.onDelete}
+                            onCopy={props.onCopy}
                         />
                     ))}
                 </div>
@@ -136,7 +170,7 @@ const ConfigList = (props: {
 };
 
 // 输入字段组件
-const InputField = (props) => {
+const InputField = (props: InputFieldProps) => {
     return (
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">
@@ -224,21 +258,34 @@ const modelFields = [
 ];
 
 // 配置编辑表单组件
-const ConfigEditForm = (props) => {
-    const handleSubmit = (e) => {
+const ConfigEditForm = (props: ConfigEditFormProps) => {
+    const handleSubmit = (e: Event) => {
         e.preventDefault();
-        const formData = new FormData(e.target);
-        const newConfig = { ...props.config() }; // 从初始配置拷贝 ID
+        const formData = new FormData(e.target as HTMLFormElement);
+        // Initialize with defaultModelConfig to ensure all properties are present and typed correctly
+        // Then merge with current config for editing existing fields
+        const currentConfig = props.config() || {
+            ...defaultModelConfig,
+            id: "",
+        }; // Ensure id is present even for default
+        const newConfig: ModelConfig = { ...currentConfig };
+
         modelFields.forEach((field) => {
-            let value = formData.get(field.key);
+            let value: FormDataEntryValue | null = formData.get(field.key);
             if (field.type === "number") {
-                value = parseFloat(value);
-                if (isNaN(value)) value = undefined; // 处理空字符串或无效数字
+                const parsedValue = parseFloat(value as string);
+                if (!isNaN(parsedValue)) {
+                    (newConfig as any)[field.key] = parsedValue; // Still need any due to dynamic key access without index signature
+                } else if (field.required) {
+                    // If required number field is empty/invalid, handle as error or default
+                    // For now, we rely on validateConfig to catch this.
+                }
+            } else {
+                (newConfig as any)[field.key] = value as string; // Still need any due to dynamic key access without index signature
             }
-            newConfig[field.key] = value;
         });
 
-        // 添加 ID，如果是新增配置
+        // Add ID if it's a new config (should already have an id from currentConfig or defaultModelConfig)
         if (!newConfig.id) {
             newConfig.id =
                 Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -278,7 +325,9 @@ const ConfigEditForm = (props) => {
                         InputField({
                             label: field.label,
                             type: field.type,
-                            value: props.config()?.[field.key],
+                            value: (props.config() || defaultModelConfig)[
+                                field.key as keyof ModelConfig
+                            ],
                             name: field.key,
                             placeholder: field.placeholder,
                             error: props.errors()[field.key],
@@ -293,7 +342,9 @@ const ConfigEditForm = (props) => {
                         InputField({
                             label: field.label,
                             type: field.type,
-                            value: props.config()?.[field.key],
+                            value: (props.config() || defaultModelConfig)[
+                                field.key as keyof ModelConfig
+                            ],
                             name: field.key,
                             placeholder: field.placeholder,
                             error: props.errors()[field.key],
@@ -324,7 +375,10 @@ const ConfigEditForm = (props) => {
     );
 };
 
-export const ModelConfigModal = (props) => {
+export const ModelConfigModal = (props: {
+    isOpen: boolean;
+    onClose: () => void;
+}) => {
     const [selectedModelId, setSelectedModelId] = createStoreSignal(
         "selectedModelId",
         undefined
@@ -333,28 +387,34 @@ export const ModelConfigModal = (props) => {
         "modelConfigs",
         []
     );
-    const [editingConfig, setEditingConfig] = createSignal(null);
+    const [editingConfig, setEditingConfig] = createSignal<ModelConfig | null>(
+        null
+    );
     const [isEditing, setIsEditing] = createSignal(false);
     const [errors, setErrors] = createStoreSignal("errors", {});
 
     // 生成唯一ID
-    const generateId = () =>
+    const generateId = (): string =>
         Date.now().toString(36) + Math.random().toString(36).substr(2);
 
     // 验证配置
-    const validateConfig = (config) => {
-        const newErrors = {};
+    const validateConfig = (config: ModelConfig) => {
+        const newErrors: { [key: string]: string } = {};
         if (!config.name?.trim()) newErrors.name = "请输入配置名称";
         if (!config.model_name?.trim()) newErrors.model_name = "请输入模型名称";
         if (!config.provider_key?.trim())
             newErrors.provider_key = "请输入API密钥";
         if (!config.provider_url?.trim())
             newErrors.provider_url = "请输入API地址";
-        if (config.temperature < 0 || config.temperature > 2)
+        if (
+            config.temperature &&
+            (config.temperature < 0 || config.temperature > 2)
+        )
             newErrors.temperature = "温度范围: 0-2";
-        if (config.top_p < 0 || config.top_p > 1)
+        if (config.top_p && (config.top_p < 0 || config.top_p > 1))
             newErrors.top_p = "Top P范围: 0-1";
-        if (config.max_tokens < 1) newErrors.max_tokens = "最大Token必须大于0";
+        if (config.max_tokens && config.max_tokens < 1)
+            newErrors.max_tokens = "最大Token必须大于0";
 
         // 检查名称重复
         const existing = modelConfigs().find(
@@ -367,20 +427,37 @@ export const ModelConfigModal = (props) => {
 
     // 开始新建配置
     const startNewConfig = () => {
-        setEditingConfig({ ...defaultModelConfig, id: generateId() });
+        setEditingConfig({
+            ...defaultModelConfig,
+            id: generateId(),
+        } as ModelConfig);
         setIsEditing(true);
         setErrors({});
     };
 
     // 开始编辑配置
-    const startEditConfig = (config) => {
+    const startEditConfig = (config: ModelConfig) => {
         setEditingConfig({ ...config });
         setIsEditing(true);
         setErrors({});
     };
 
+    // 复制配置
+    const copyConfig = (config: ModelConfig) => {
+        const newConfig = {
+            ...config,
+            id: generateId(),
+            name: `${config.name} (复制)`,
+        };
+        // Ensure the newConfig ID is truly unique and doesn't conflict with existing ones
+        // This simplified generateId() might cause very rare conflicts if called in rapid succession.
+        setEditingConfig(newConfig);
+        setIsEditing(true);
+        setErrors({});
+    };
+
     // 保存配置
-    const saveConfig = (config) => {
+    const saveConfig = (config: ModelConfig) => {
         const validationErrors = validateConfig(config);
 
         if (Object.keys(validationErrors).length > 0) {
@@ -415,20 +492,20 @@ export const ModelConfigModal = (props) => {
     };
 
     // 删除配置
-    const deleteConfig = (configId) => {
+    const deleteConfig = (configId: string) => {
         if (confirm("确定要删除这个模型配置吗？")) {
             const newConfigs = modelConfigs().filter((c) => c.id !== configId);
             setModelConfigs(newConfigs);
 
             // 如果删除的是当前选中的配置，清空选择
-            if (props.selectedConfigId?.() === configId) {
-                setSelectedModelId(null);
+            if (selectedModelId() === configId) {
+                setSelectedModelId(undefined);
             }
         }
     };
 
     // 选择配置
-    const selectConfig = (config) => {
+    const selectConfig = (config: ModelConfig) => {
         setSelectedModelId(config.id);
         props.onClose?.();
     };
@@ -478,6 +555,7 @@ export const ModelConfigModal = (props) => {
                             onEdit: startEditConfig,
                             onDelete: deleteConfig,
                             onNew: startNewConfig,
+                            onCopy: copyConfig,
                         })}
                     {isEditing() &&
                         ConfigEditForm({
@@ -485,8 +563,6 @@ export const ModelConfigModal = (props) => {
                             errors: errors,
                             onSave: saveConfig,
                             onCancel: cancelEdit,
-                            validateConfig: validateConfig,
-                            setErrors: setErrors,
                         })}
                 </div>
             </div>

@@ -6,33 +6,33 @@ import {
     type MessageUnion,
     type BaseMessageLike,
 } from "@langchain/core/messages";
+import type { MessagesTemplate } from "../types.js";
 
-export interface Template {
-    role: string;
-    content: string | any[];
-    tool_calls: any[];
-    tool_call_id: string;
-    invalid_tool_calls: any[];
-}
-
-export const createChatTemplate = (template: Template[]): BaseMessageLike[] => {
+export const createChatTemplate = (
+    template: MessagesTemplate[]
+): BaseMessageLike[] => {
     return template.map((i) => {
         switch (i.role) {
             case "system":
                 /** @ts-ignore */
                 return new SystemMessage(i.content);
             case "human":
+                /** @ts-ignore */
                 return new HumanMessage(i);
             case "ai":
+                /** @ts-ignore */
                 return new AIMessageChunk(i);
             case "tool":
+                /** @ts-ignore */
                 return new ToolMessage(i);
             default:
                 return new HumanMessage(i.content as string);
         }
     });
 };
-export const messagesToTemplate = (messages: MessageUnion[]): Template[] => {
+export const messagesToTemplate = (
+    messages: MessageUnion[]
+): MessagesTemplate[] => {
     return messages.map((i: any) => {
         return {
             role: i.getType(),

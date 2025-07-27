@@ -91,3 +91,7 @@ export interface TraceInfo {
     last_run_time: string;
     runs: RunRecord[];
 }
+
+export type { MessagesTemplate } from "./routes/llm-routes.js";
+
+export type { ModelConfig } from "./routes/llm-routes.js";

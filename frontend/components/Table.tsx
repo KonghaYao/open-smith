@@ -1,10 +1,19 @@
-export const Table = (props: {
-    columnsConfig: any[];
-    data: any[];
-    onRowClick: (row: any) => void;
+import type { JSX } from "solid-js";
+
+export type TableColumn<T> = {
+    header: string;
+    key: keyof T | (keyof T)[];
+    class?: string;
+    format?: (row: T) => JSX.Element;
+};
+
+export function Table<T>(props: {
+    columnsConfig: TableColumn<T>[];
+    data: T[];
+    onRowClick: (row: T) => void;
     loading: boolean;
     error: any;
-}) => {
+}) {
     return (
         <div class="bg-white shadow rounded-lg p-4 flex-1 overflow-auto flex flex-col">
             <h2 class="text-lg font-semibold text-gray-800 mb-4">
@@ -29,7 +38,7 @@ export const Table = (props: {
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            {props.data.map((row, rowIdx) => (
+                            {props.data.map((row) => (
                                 <tr
                                     class="hover:bg-gray-50 cursor-pointer"
                                     onClick={() => props.onRowClick(row)}>
@@ -39,9 +48,11 @@ export const Table = (props: {
                                                 ? col.format(row)
                                                 : Array.isArray(col.key)
                                                 ? col.key
-                                                      .map((k) => row[k])
+                                                      .map((k: keyof T) =>
+                                                          String(row[k] ?? "")
+                                                      )
                                                       .join(" ")
-                                                : row[col.key]}
+                                                : String(row[col.key] ?? "")}
                                         </td>
                                     ))}
                                 </tr>
@@ -54,4 +65,4 @@ export const Table = (props: {
             )}
         </div>
     );
-};
+}

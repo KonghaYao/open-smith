@@ -23,6 +23,7 @@
         "@hono/node-server": "^1.15.0",
         "@langchain/core": "^0.3.66",
         "@langchain/openai": "^0.6.2",
+        "@langgraph-js/pro": "^1.8.0",
         "@types/pg": "^8.15.4",
         "better-sqlite3": "^12.2.0",
         "hono": "^4.8.4",
@@ -45,6 +46,7 @@
         "typescript": "^5.8.3",
         "unocss": "^66.3.3",
         "vite": "^6",
+        "vite-plugin-node-polyfills": "^0.24.0",
         "vite-plugin-solid": "^2.11.7"
     },
     "pnpm": {

@@ -1,6 +1,6 @@
 import { createMemo, createResource } from "solid-js";
 import { GraphStateMessage, GraphStatePanel } from "../Graph/GraphState.jsx";
-import { compile } from "https://esm.sh/json-schema-to-typescript-lite";
+import { compile } from "json-schema-to-typescript-lite";
 
 import {
     createStoreSignal,
@@ -9,7 +9,6 @@ import {
 } from "../../utils.js";
 import { setDefaultMessage } from "../../pages/PlayGround/index.jsx";
 import { messagesToTemplate } from "../../types.js";
-import type { MessageTemplate } from "../../types.js";
 import type { RunRecord, AttachmentRecord } from "../../../src/types.js";
 
 // 输入输出标签页组件
@@ -177,9 +176,7 @@ const InputsSection = (props: { inputs: any }) => {
                                 <button
                                     onClick={() => {
                                         setDefaultMessage(
-                                            messagesToTemplate(
-                                                props.messages as MessageTemplate[]
-                                            )
+                                            messagesToTemplate(props.messages)
                                         );
                                         // hash 改为 /playground
                                         window.location.hash = "/playground";

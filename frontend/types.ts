@@ -1,11 +1,12 @@
+import { type MessagesTemplate } from "../src/routes/llm-routes.js";
 // Template 接口定义，对应后端的 Template 类型
 export const createTemplate = (
-    role,
-    content,
-    tool_calls = [],
-    tool_call_id = "",
+    role: "system" | "human" | "ai" | "tool",
+    content: string,
+    tool_calls: any[] = [],
+    tool_call_id: string = "",
     invalid_tool_calls = []
-) => {
+): MessagesTemplate => {
     return {
         role,
         content,
@@ -16,12 +17,14 @@ export const createTemplate = (
 };
 
 // 默认的空 Template
-export const createEmptyTemplate = (role = "user") => {
+export const createEmptyTemplate = (
+    role: "system" | "human" | "ai" | "tool" = "human"
+) => {
     return createTemplate(role, "");
 };
 
 // 变量识别函数 - 使用特殊标签 {{var}} 替代 {var}
-export const extractVariables = (content: string) => {
+export const extractVariables = (content: MessagesTemplate["content"]) => {
     if (typeof content === "string") {
         const matches = content.match(/\{\{(\w+)\}\}/g);
         if (!matches) return [];
@@ -33,14 +36,18 @@ export const extractVariables = (content: string) => {
             if (item.type === "text" && item.text) {
                 const matches = item.text.match(/\{\{(\w+)\}\}/g);
                 if (matches) {
-                    matches.forEach((match) => vars.add(match.slice(2, -2)));
+                    matches.forEach((match: string) =>
+                        vars.add(match.slice(2, -2))
+                    );
                 }
             }
             // 也可以在 image_url 的 URL 中支持变量
             if (item.type === "image_url" && item.image_url?.url) {
                 const matches = item.image_url.url.match(/\{\{(\w+)\}\}/g);
                 if (matches) {
-                    matches.forEach((match) => vars.add(match.slice(2, -2)));
+                    matches.forEach((match: string) =>
+                        vars.add(match.slice(2, -2))
+                    );
                 }
             }
         });
@@ -50,7 +57,7 @@ export const extractVariables = (content: string) => {
 };
 
 // 从 Template 数组中提取所有变量
-export const extractAllVariables = (templates: any[]) => {
+export const extractAllVariables = (templates: MessagesTemplate[]) => {
     const vars = new Set();
     templates.forEach((template) => {
         if (typeof template.content === "string") {
@@ -65,7 +72,10 @@ export const extractAllVariables = (templates: any[]) => {
 };
 
 // 替换内容中的变量
-export const replaceVariables = (content: any, variables: any) => {
+export const replaceVariables = (
+    content: MessagesTemplate["content"],
+    variables: Record<string, string>
+) => {
     if (typeof content === "string") {
         let result = content;
         Object.entries(variables).forEach(([key, value]) => {
@@ -100,7 +110,7 @@ export const replaceVariables = (content: any, variables: any) => {
     return content;
 };
 
-export const messagesToTemplate = (messages: any[]) => {
+export const messagesToTemplate = (messages: any[]): MessagesTemplate[] => {
     return messages.map((i) => {
         return {
             role: i.getType(),
@@ -111,3 +121,5 @@ export const messagesToTemplate = (messages: any[]) => {
         };
     });
 };
+
+export { type ModelConfig, type MessagesTemplate } from "../src/types.js";

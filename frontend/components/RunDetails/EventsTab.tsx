@@ -1,5 +1,5 @@
 import { EventTimeline } from "./EventTimeline.js";
-import type { RunRecord } from "../../../src/database.js";
+import type { RunRecord } from "../../../src/types.js";
 
 // 事件标签页组件
 export const EventsTab = (props: { run: RunRecord }) => {

@@ -1,8 +1,9 @@
 import { createSignal, createResource, Show, For } from "solid-js";
 import { X, Plus } from "lucide-solid";
-import { Table } from "../components/Table.jsx"; // 导入 Table 组件
+import { Table, type TableColumn } from "../components/Table.jsx"; // 导入 Table 组件
 import { getMasterKey } from "../utils/master-key-manager.js"; // 导入 getMasterKey
 import { fetch } from "../api.js";
+import type { SystemRecord } from "../../src/types.js";
 export const SystemsPage = () => {
     // 状态管理
     const [newSystemName, setNewSystemName] = createSignal("");
@@ -91,7 +92,7 @@ export const SystemsPage = () => {
                     text: result.message || "创建失败",
                 });
             }
-        } catch (error) {
+        } catch (error: any) {
             setMessage({ type: "error", text: "网络错误：" + error.message });
         } finally {
             setIsCreating(false);
@@ -99,7 +100,7 @@ export const SystemsPage = () => {
     };
 
     // 重新生成 API Key
-    const regenerateApiKey = async (systemId) => {
+    const regenerateApiKey = async (systemId: string) => {
         if (!confirm("确定要重新生成 API Key 吗？旧的 Key 将失效。")) return;
 
         try {
@@ -121,13 +122,13 @@ export const SystemsPage = () => {
                     text: result.message || "重新生成失败",
                 });
             }
-        } catch (error) {
+        } catch (error: any) {
             setMessage({ type: "error", text: "网络错误：" + error.message });
         }
     };
 
     // 复制到剪贴板
-    const copyToClipboard = async (text) => {
+    const copyToClipboard = async (text: string) => {
         try {
             await navigator.clipboard.writeText(text);
             setMessage({ type: "success", text: "已复制到剪贴板" });
@@ -145,12 +146,12 @@ export const SystemsPage = () => {
     }, 5000);
 
     // 定义 Table 组件的列配置
-    const systemsTableColumns = [
+    const systemsTableColumns: TableColumn<SystemRecord>[] = [
         {
             header: "系统信息",
             key: ["name", "description"], // 可以是数组，用于显示多个字段
-            className: "px-6 py-4 whitespace-nowrap",
-            format: (row) => (
+            class: "px-6 py-4 whitespace-nowrap",
+            format: (row: SystemRecord) => (
                 <div>
                     <div class="text-sm font-medium text-gray-900">
                         {row.name}
@@ -166,8 +167,8 @@ export const SystemsPage = () => {
         {
             header: "API Key",
             key: "api_key",
-            className: "px-6 py-4 whitespace-nowrap",
-            format: (row: any) => (
+            class: "px-6 py-4 whitespace-nowrap",
+            format: (row: SystemRecord) => (
                 <div class="flex items-center gap-2">
                     <code class="text-sm bg-gray-100 px-2 py-1 rounded font-mono">
                         {row.api_key.substring(0, 8)}...
@@ -184,16 +185,15 @@ export const SystemsPage = () => {
         {
             header: "创建时间",
             key: "created_at",
-            className: "px-6 py-4 whitespace-nowrap text-sm text-gray-500",
-            format: (row: any) =>
+            class: "px-6 py-4 whitespace-nowrap text-sm text-gray-500",
+            format: (row: SystemRecord) =>
                 new Date(row.created_at).toLocaleString("zh-CN"),
         },
         {
             header: "操作",
             key: "id",
-            className:
-                "px-6 py-4 whitespace-nowrap text-right text-sm font-medium",
-            format: (row: any) => (
+            class: "px-6 py-4 whitespace-nowrap text-right text-sm font-medium",
+            format: (row: SystemRecord) => (
                 <button
                     onClick={() => regenerateApiKey(row.id)}
                     class="text-blue-600 hover:text-blue-900 mr-3"

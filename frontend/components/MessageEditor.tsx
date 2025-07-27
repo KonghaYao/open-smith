@@ -1,10 +1,13 @@
 import { X, Type, List, Trash2 } from "lucide-solid";
+import type { MessagesTemplate } from "../types.js";
+
+type Content = MessagesTemplate["content"];
 
 const messageTypes = ["system", "human", "ai", "tool"];
 const contentTypes = ["text", "image_url"];
 
 // 检查 content 是否为数组格式
-const isContentArray = (content) => {
+const isContentArray = (content: Content) => {
     return Array.isArray(content);
 };
 
@@ -19,7 +22,7 @@ const createContentItem = (type = "text", value = "") => {
 };
 
 // 将字符串内容转换为数组格式
-const stringToContentArray = (content) => {
+const stringToContentArray = (content: Content) => {
     if (typeof content === "string") {
         return [createContentItem("text", content)];
     }
@@ -27,7 +30,7 @@ const stringToContentArray = (content) => {
 };
 
 // 将数组内容转换为字符串格式（如果只有一个文本项）
-const contentArrayToString = (content) => {
+const contentArrayToString = (content: Content) => {
     if (
         Array.isArray(content) &&
         content.length === 1 &&
@@ -38,10 +41,14 @@ const contentArrayToString = (content) => {
     return content;
 };
 
-export const MessageEditor = (props) => {
+export const MessageEditor = (props: {
+    messages: MessagesTemplate[];
+    onUpdateMessage: (index: number, message: MessagesTemplate) => void;
+    onRemoveMessage: (index: number) => void;
+}) => {
     return (
         <div class="space-y-3">
-            {props.messages().map((message, index) => (
+            {props.messages.map((message, index) => (
                 <div class="bg-white border border-gray-200 rounded-lg p-3">
                     <div class="flex justify-between items-center mb-2">
                         <select
@@ -49,7 +56,8 @@ export const MessageEditor = (props) => {
                             onChange={(e) =>
                                 props.onUpdateMessage(index, {
                                     ...message,
-                                    role: (e.target as HTMLSelectElement).value,
+                                    role: (e.target as HTMLSelectElement)
+                                        .value as MessagesTemplate["role"],
                                 })
                             }
                             class="font-semibold text-xs uppercase bg-transparent focus:outline-none">
@@ -71,7 +79,7 @@ export const MessageEditor = (props) => {
                                         : stringToContentArray(message.content);
                                     props.onUpdateMessage(index, {
                                         ...message,
-                                        content: newContent,
+                                        content: newContent!,
                                     });
                                 }}
                                 class="p-1 text-gray-400 hover:text-blue-500"
@@ -99,7 +107,6 @@ export const MessageEditor = (props) => {
                         onUpdateMessage: props.onUpdateMessage,
                         index: index,
                         isContentArray: isContentArray,
-                        createContentItem: createContentItem,
                         contentTypes: contentTypes,
                     })}
                     {ToolCallIdEditor({
@@ -114,10 +121,16 @@ export const MessageEditor = (props) => {
 };
 
 // MessageContentEditor 组件
-const MessageContentEditor = (props) => {
+const MessageContentEditor = (props: {
+    message: MessagesTemplate;
+    onUpdateMessage: (index: number, message: MessagesTemplate) => void;
+    index: number;
+    isContentArray: (content: Content) => boolean;
+    contentTypes: string[];
+}) => {
     return (
         <>
-            {!isContentArray(props.message.content) ? (
+            {typeof props.message.content === "string" ? (
                 <textarea
                     value={props.message.content || ""}
                     onChange={(e) =>
@@ -132,120 +145,131 @@ const MessageContentEditor = (props) => {
                 />
             ) : (
                 <div class="space-y-2">
-                    {props.message.content.map(
-                        (item: any, itemIndex: number) => (
-                            <div
-                                class="flex items-start space-x-2 p-2 border border-gray-200 rounded"
-                                key={itemIndex}>
-                                <select
-                                    value={item.type}
-                                    onChange={(e) => {
-                                        const newContent = [
-                                            ...props.message.content,
-                                        ];
-                                        const oldValue =
-                                            item.type === "text"
-                                                ? item.text
-                                                : item.image_url?.url || "";
-                                        newContent[itemIndex] =
-                                            props.createContentItem(
-                                                (e.target as HTMLSelectElement)
-                                                    .value,
-                                                oldValue
-                                            );
-                                        props.onUpdateMessage(props.index, {
-                                            ...props.message,
-                                            content: newContent,
-                                        });
-                                    }}
-                                    class="text-sm border border-gray-300 rounded p-1">
-                                    {props.contentTypes.map((type: string) => (
-                                        <option
-                                            value={type}
-                                            selected={item.type === type}>
-                                            {type}
-                                        </option>
-                                    ))}
-                                </select>
-                                <div class="flex-1">
-                                    {item.type === "text" && (
-                                        <textarea
-                                            value={item.text || ""}
-                                            onChange={(e) => {
-                                                const newContent = [
-                                                    ...props.message.content,
-                                                ];
-                                                newContent[itemIndex] = {
-                                                    ...item,
-                                                    text: (
-                                                        e.target as HTMLTextAreaElement
+                    {props.message.content.map((item, itemIndex: number) => (
+                        <div class="flex items-start space-x-2 p-2 border border-gray-200 rounded">
+                            <select
+                                value={item.type}
+                                onChange={(e) => {
+                                    if (
+                                        typeof props.message.content ===
+                                        "string"
+                                    ) {
+                                        return;
+                                    }
+                                    const newContent = [
+                                        ...props.message.content,
+                                    ];
+                                    const oldValue =
+                                        item.type === "text"
+                                            ? item.text
+                                            : item.image_url?.url || "";
+                                    newContent[itemIndex] = createContentItem(
+                                        (e.target as HTMLSelectElement).value,
+                                        oldValue
+                                    );
+                                    props.onUpdateMessage(props.index, {
+                                        ...props.message,
+                                        content: newContent,
+                                    });
+                                }}
+                                class="text-sm border border-gray-300 rounded p-1">
+                                {props.contentTypes.map((type: string) => (
+                                    <option
+                                        value={type}
+                                        selected={item.type === type}>
+                                        {type}
+                                    </option>
+                                ))}
+                            </select>
+                            <div class="flex-1">
+                                {item.type === "text" && (
+                                    <textarea
+                                        value={item.text || ""}
+                                        onChange={(e) => {
+                                            if (
+                                                typeof props.message.content ===
+                                                "string"
+                                            ) {
+                                                return;
+                                            }
+                                            const newContent = [
+                                                ...props.message.content,
+                                            ];
+                                            newContent[itemIndex] = {
+                                                ...item,
+                                                text: (
+                                                    e.target as HTMLTextAreaElement
+                                                ).value,
+                                            };
+                                            props.onUpdateMessage(props.index, {
+                                                ...props.message,
+                                                content: newContent,
+                                            });
+                                        }}
+                                        placeholder="Enter text content..."
+                                        class="w-full p-2 border border-gray-300 rounded-md resize-y focus:ring-2 focus:ring-blue-400"
+                                        rows={2}
+                                    />
+                                )}
+                                {item.type === "image_url" && (
+                                    <input
+                                        type="text"
+                                        value={item.image_url?.url || ""}
+                                        onChange={(e) => {
+                                            if (
+                                                typeof props.message.content ===
+                                                "string"
+                                            ) {
+                                                return;
+                                            }
+                                            const newContent = [
+                                                ...props.message.content,
+                                            ];
+                                            newContent[itemIndex] = {
+                                                ...item,
+                                                image_url: {
+                                                    url: (
+                                                        e.target as HTMLInputElement
                                                     ).value,
-                                                };
-                                                props.onUpdateMessage(
-                                                    props.index,
-                                                    {
-                                                        ...props.message,
-                                                        content: newContent,
-                                                    }
-                                                );
-                                            }}
-                                            placeholder="Enter text content..."
-                                            class="w-full p-2 border border-gray-300 rounded-md resize-y focus:ring-2 focus:ring-blue-400"
-                                            rows={2}
-                                        />
-                                    )}
-                                    {item.type === "image_url" && (
-                                        <input
-                                            type="text"
-                                            value={item.image_url?.url || ""}
-                                            onChange={(e) => {
-                                                const newContent = [
-                                                    ...props.message.content,
-                                                ];
-                                                newContent[itemIndex] = {
-                                                    ...item,
-                                                    image_url: {
-                                                        url: (
-                                                            e.target as HTMLInputElement
-                                                        ).value,
-                                                    },
-                                                };
-                                                props.onUpdateMessage(
-                                                    props.index,
-                                                    {
-                                                        ...props.message,
-                                                        content: newContent,
-                                                    }
-                                                );
-                                            }}
-                                            placeholder="Enter image URL..."
-                                            class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400"
-                                        />
-                                    )}
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        const newContent =
-                                            props.message.content.filter(
-                                                (_: any, i: number) =>
-                                                    i !== itemIndex
-                                            );
-                                        props.onUpdateMessage(props.index, {
-                                            ...props.message,
-                                            content:
-                                                newContent.length > 0
-                                                    ? newContent
-                                                    : "",
-                                        });
-                                    }}
-                                    class="p-1 text-gray-400 hover:text-red-500"
-                                    title="删除内容项">
-                                    <X></X>
-                                </button>
+                                                },
+                                            };
+                                            props.onUpdateMessage(props.index, {
+                                                ...props.message,
+                                                content: newContent,
+                                            });
+                                        }}
+                                        placeholder="Enter image URL..."
+                                        class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400"
+                                    />
+                                )}
                             </div>
-                        )
-                    )}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (
+                                        typeof props.message.content ===
+                                        "string"
+                                    ) {
+                                        return;
+                                    }
+                                    const newContent =
+                                        props.message.content.filter(
+                                            (_, i) => i !== itemIndex
+                                        );
+                                    props.onUpdateMessage(props.index, {
+                                        ...props.message,
+                                        content:
+                                            newContent.length > 0
+                                                ? newContent
+                                                : "",
+                                    });
+                                }}
+                                class="p-1 text-gray-400 hover:text-red-500"
+                                title="删除内容项">
+                                <X></X>
+                            </button>
+                        </div>
+                    ))}
                     <button
                         type="button"
                         onClick={() => {
@@ -254,9 +278,7 @@ const MessageContentEditor = (props) => {
                             )
                                 ? [...props.message.content]
                                 : [];
-                            newContent.push(
-                                props.createContentItem("text", "")
-                            );
+                            newContent.push(createContentItem("text", ""));
                             props.onUpdateMessage(props.index, {
                                 ...props.message,
                                 content: newContent,
@@ -272,7 +294,11 @@ const MessageContentEditor = (props) => {
 };
 
 // ToolCallIdEditor 组件
-const ToolCallIdEditor = (props) => {
+const ToolCallIdEditor = (props: {
+    message: MessagesTemplate;
+    onUpdateMessage: (index: number, message: MessagesTemplate) => void;
+    index: number;
+}) => {
     return (
         props.message.role === "tool" && (
             <div class="mt-2 space-y-2">

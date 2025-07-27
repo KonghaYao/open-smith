@@ -1,12 +1,16 @@
 import { onCleanup } from "solid-js";
 import { X } from "lucide-solid";
 import { RunDetails } from "../app/RunDetails.jsx";
+import type { RunRecord, TraceInfo } from "../../../src/types.js";
 
-export const RunDetailsPanel = (props) => {
+export const RunDetailsPanel = (props: {
+    run: RunRecord;
+    onClose: () => void;
+}) => {
     // 点击外部关闭的逻辑
-    const handleClickOutside = (event) => {
+    const handleClickOutside = (event: MouseEvent) => {
         const panel = document.getElementById("run-details-panel");
-        if (panel && !panel.contains(event.target)) {
+        if (panel && !panel.contains(event.target as Node)) {
             props.onClose();
         }
     };
@@ -29,11 +33,13 @@ export const RunDetailsPanel = (props) => {
             </button>
             <RunDetails
                 selectedRunId={() => props.run.id}
-                currentTraceData={() => ({
-                    runs: [props.run],
-                })}
-                feedbacks={[]}
-                attachments={[]}
+                currentTraceData={() =>
+                    ({
+                        runs: [props.run],
+                    } as any as TraceInfo)
+                }
+                refresh={() => {}}
+                refreshTrigger={() => 0}
             />
         </div>
     );

@@ -17,6 +17,7 @@ import {
     Copy,
     X,
 } from "lucide-solid";
+import type { RunRecord } from "../../../src/types.js";
 
 // 定义类型接口
 interface LlmRunFilters {
@@ -27,24 +28,10 @@ interface LlmRunFilters {
     user_id?: string;
 }
 
-interface RunData {
-    trace_id: string;
-    thread_id: string;
-    name: string;
-    system: string;
-    model_name: string;
-    time_to_first_token: number;
-    start_time: number;
-    end_time: number;
-    total_tokens: number;
-    user_id: string;
-    id: string; // Add id for delete/regenerate key
-}
-
 interface ColumnConfig {
     header: string;
     key: string | string[];
-    format: (run: RunData) => JSXElement;
+    format: (run: RunRecord) => JSXElement;
     className: string;
 }
 
@@ -71,7 +58,7 @@ const columnsConfig: ColumnConfig[] = [
     {
         header: "关联 ID",
         key: ["trace_id", "thread_id"],
-        format: (run: RunData) => (
+        format: (run) => (
             <div class="space-y-1">
                 <div class="flex items-center space-x-2">
                     <div class="text-xs text-gray-400 uppercase tracking-wide">
@@ -79,7 +66,7 @@ const columnsConfig: ColumnConfig[] = [
                     </div>
                     {run.thread_id && (
                         <button
-                            onClick={() => copyToClipboard(run.thread_id)}
+                            onClick={() => copyToClipboard(run.thread_id!)}
                             class="text-sm text-gray-500 hover:text-gray-700 transition-colors"
                             title="复制 会话 ID">
                             <Copy class="inline-block w-3 h-3 mr-1" />
@@ -96,7 +83,7 @@ const columnsConfig: ColumnConfig[] = [
                     </div>
                     {run.trace_id && (
                         <button
-                            onClick={() => copyToClipboard(run.trace_id)}
+                            onClick={() => copyToClipboard(run.trace_id!)}
                             class="text-sm text-gray-500 hover:text-gray-700 transition-colors"
                             title="复制 多轮对话 ID">
                             <Copy class="inline-block w-3 h-3 mr-1" />
@@ -114,7 +101,7 @@ const columnsConfig: ColumnConfig[] = [
     {
         header: "运行详情",
         key: ["name", "system"],
-        format: (run: RunData) => (
+        format: (run) => (
             <div class="space-y-1">
                 <div class="text-xs text-gray-400 uppercase tracking-wide">
                     名称
@@ -133,7 +120,7 @@ const columnsConfig: ColumnConfig[] = [
     {
         header: "模型名称",
         key: "model_name",
-        format: (run: RunData) => (
+        format: (run) => (
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
                 {run.model_name || "-"}
             </span>
@@ -143,9 +130,9 @@ const columnsConfig: ColumnConfig[] = [
     {
         header: "首字时间",
         key: "time_to_first_token",
-        format: (run: RunData) => (
+        format: (run) => (
             <span class="text-sm font-mono text-gray-700">
-                {formatTimeToFirstToken(run.time_to_first_token)}
+                {formatTimeToFirstToken(run.time_to_first_token!)}
             </span>
         ),
         className: "px-4 py-3 border-b border-gray-100 text-center",
@@ -153,7 +140,7 @@ const columnsConfig: ColumnConfig[] = [
     {
         header: "生成时长",
         key: ["start_time", "end_time"],
-        format: (run: RunData) => (
+        format: (run) => (
             <span class="text-sm font-mono text-gray-700">
                 {formatDuration(
                     run.start_time.toString(),
@@ -166,7 +153,7 @@ const columnsConfig: ColumnConfig[] = [
     {
         header: "总 Token",
         key: "total_tokens",
-        format: (run: RunData) => (
+        format: (run) => (
             <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200">
                 {(run.total_tokens || 0).toLocaleString()}
             </span>
@@ -176,7 +163,7 @@ const columnsConfig: ColumnConfig[] = [
     {
         header: "用户 ID",
         key: "user_id",
-        format: (run: RunData) => (
+        format: (run) => (
             <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200">
                 {run.user_id || "-"}
             </span>
@@ -186,7 +173,7 @@ const columnsConfig: ColumnConfig[] = [
     {
         header: "起始时间",
         key: "start_time",
-        format: (run: RunData) => (
+        format: (run) => (
             <span class="text-sm text-gray-600">
                 {formatUnixTimestamp(run.start_time.toString())}
             </span>
@@ -245,7 +232,7 @@ const fetchLlmRuns = async ([currentPage, itemsPerPage, filters]: [
         );
         if (response.success && Array.isArray(response.data)) {
             return {
-                runs: response.data as RunData[],
+                runs: response.data as RunRecord[],
                 total: response.total as number,
             };
         } else {
@@ -259,7 +246,7 @@ const fetchLlmRuns = async ([currentPage, itemsPerPage, filters]: [
 
 interface RunDataResponse {
     success: boolean;
-    data: RunData[];
+    data: RunRecord[];
     total: number;
 }
 
@@ -317,9 +304,9 @@ export const LlmRecords = () => {
         setCurrentPage((prev) => Math.min(totalPages(), prev + 1));
     };
 
-    const [selectedRun, setSelectedRun] = createSignal<RunData | null>(null);
+    const [selectedRun, setSelectedRun] = createSignal<RunRecord | null>(null);
 
-    const handleRowClick = (run: RunData) => {
+    const handleRowClick = (run: RunRecord) => {
         setSelectedRun(run);
     };
 
@@ -601,7 +588,7 @@ export const LlmRecords = () => {
                                     </thead>
                                     <tbody class="bg-white divide-y divide-gray-200">
                                         <For each={llmRunsResource()?.runs}>
-                                            {(run: RunData) => (
+                                            {(run) => (
                                                 <tr
                                                     class="hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-100"
                                                     onClick={() =>
@@ -687,7 +674,6 @@ export const LlmRecords = () => {
                         {
                             <RunDetailsPanel
                                 run={selectedRun()!}
-                                attachments={[]}
                                 onClose={() => setSelectedRun(null)}
                             />
                         }
