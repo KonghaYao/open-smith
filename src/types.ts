@@ -82,6 +82,25 @@ export interface TraceOverview {
     user_id?: string; // 新增：用户ID
 }
 
+export type RunStatsHourlyRecord = {
+    stat_hour: string;
+    model_name: string | null;
+    system: string | null;
+    total_runs: number;
+    successful_runs: number;
+    failed_runs: number;
+    error_rate: number;
+    total_duration_ms: number;
+    avg_duration_ms: number;
+    p95_duration_ms: number;
+    p99_duration_ms: number;
+    total_tokens_sum: number;
+    avg_tokens_per_run: number;
+    avg_ttft_ms: number;
+    p95_ttft_ms: number;
+    distinct_users: number;
+};
+
 export interface TraceInfo {
     trace_id: string;
     total_runs: number;

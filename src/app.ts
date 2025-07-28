@@ -10,6 +10,7 @@ import { TraceDatabase, type DatabaseAdapter } from "./database.js";
 import { ApiKeyCache } from "./api-key-cache.js"; // 更新导入路径
 import { createAdminRouter } from "./routes/admin-routes.js";
 import { createRunsRouter } from "./routes/runs-routes.js";
+import { createStatsRouter } from "./routes/stats-router.js";
 
 import path from "path";
 import fs from "fs";
@@ -65,6 +66,10 @@ app.route("/admin", adminRouter);
 // 创建并挂载 runs 路由器
 const runsRouter = createRunsRouter(multipartProcessor, apiKeyCache);
 app.route("/runs", runsRouter);
+
+// 创建并挂载 stats 路由器
+const statsRouter = createStatsRouter(db);
+app.route("/stats", statsRouter);
 
 app.use(logger());
 

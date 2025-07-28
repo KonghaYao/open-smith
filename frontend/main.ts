@@ -47,6 +47,14 @@ render(() => {
                         })
                     ),
                 }),
+                Route({
+                    path: "/stats",
+                    component: lazy(() =>
+                        import("./pages/StatsPage.jsx").then((res) => {
+                            return { default: res.default };
+                        })
+                    ),
+                }),
             ],
         }),
     });

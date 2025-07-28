@@ -1,7 +1,7 @@
 {
     "name": "@langgraph-js/open-smith",
     "type": "module",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Open Smith",
     "author": "KonghaYao",
     "license": "Apache-2.0",
@@ -41,6 +41,7 @@
         "@types/node": "^20.11.17",
         "@types/uuid": "^10.0.0",
         "@unocss/reset": "^66.3.3",
+        "chart.js": "^4.5.0",
         "json-schema-to-typescript-lite": "^14.0.0",
         "lucide-solid": "^0.526.0",
         "ofetch": "^1.4.1",

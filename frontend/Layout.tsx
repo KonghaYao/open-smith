@@ -1,5 +1,11 @@
 import { For, type JSXElement } from "solid-js";
-import { Workflow, ChartBarBig, Key, CirclePlay } from "lucide-solid";
+import {
+    Workflow,
+    ChartBarBig,
+    Key,
+    CirclePlay,
+    MessageSquareCode,
+} from "lucide-solid";
 
 const menuItems = [
     {
@@ -10,7 +16,7 @@ const menuItems = [
     {
         href: "#/llm-records",
         title: "数据概览",
-        icon: <ChartBarBig />,
+        icon: <MessageSquareCode />,
     },
     {
         href: "#/systems",
@@ -21,6 +27,11 @@ const menuItems = [
         href: "#/playground",
         title: "大模型测试",
         icon: <CirclePlay />,
+    },
+    {
+        href: "#/stats",
+        title: "统计分析",
+        icon: <ChartBarBig />,
     },
 ];
 
