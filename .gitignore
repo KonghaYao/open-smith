@@ -48,3 +48,6 @@ attachments/
 __pycache__
 .langgraph_api
 .DS_Store
+
+.venv
+*.egg-info
