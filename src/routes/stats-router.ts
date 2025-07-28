@@ -7,8 +7,7 @@ export function createStatsRouter(db: TraceDatabase) {
     // 获取每小时统计数据
     statsRouter.get("/hourly", async (c) => {
         try {
-            const { startTime, endTime, run_type, model_name, system } =
-                c.req.query();
+            const { startTime, endTime, model_name, system } = c.req.query();
             if (!startTime || !endTime) {
                 return c.json(
                     { error: "startTime and endTime are required" },
@@ -16,7 +15,6 @@ export function createStatsRouter(db: TraceDatabase) {
                 );
             }
             const stats = await db.runStatsRepo.getStats(startTime, endTime, {
-                run_type,
                 model_name,
                 system,
             });
