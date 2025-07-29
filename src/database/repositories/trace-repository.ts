@@ -285,10 +285,14 @@ export class TraceRepository {
     }
 
     // 获取线程ID概览信息 - 统一的查询方法，支持可选过滤条件
-    async getThreadOverviews(filters?: {
-        system?: string;
-        thread_id?: string;
-    }): Promise<Array<TraceOverview>> {
+    async getThreadOverviews(
+        filters?: {
+            system?: string;
+            thread_id?: string;
+        },
+        limit?: number,
+        offset?: number
+    ): Promise<Array<TraceOverview>> {
         const whereConditions: string[] = [];
         const values: any[] = [];
         let paramIndex = 1;
@@ -335,7 +339,24 @@ export class TraceRepository {
             ${whereClause}
             GROUP BY thread_id 
             ORDER BY MAX(created_at) DESC
+            ${
+                limit !== undefined
+                    ? `LIMIT ${this.adapter.getPlaceholder(paramIndex++)}`
+                    : ""
+            }
+            ${
+                offset !== undefined
+                    ? `OFFSET ${this.adapter.getPlaceholder(paramIndex++)}`
+                    : ""
+            }
         `);
+
+        if (limit !== undefined) {
+            values.push(limit);
+        }
+        if (offset !== undefined) {
+            values.push(offset);
+        }
 
         const threads = (await stmt.all(values)) as any[];
 

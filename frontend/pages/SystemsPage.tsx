@@ -4,6 +4,7 @@ import { Table, type TableColumn } from "../components/Table.jsx"; // 导入 Tab
 import { getMasterKey } from "../utils/master-key-manager.js"; // 导入 getMasterKey
 import { fetch } from "../api.js";
 import type { SystemRecord } from "../../src/types.js";
+import copy from "copy-to-clipboard";
 export const SystemsPage = () => {
     // 状态管理
     const [newSystemName, setNewSystemName] = createSignal("");
@@ -130,7 +131,7 @@ export const SystemsPage = () => {
     // 复制到剪贴板
     const copyToClipboard = async (text: string) => {
         try {
-            await navigator.clipboard.writeText(text);
+            copy(text);
             setMessage({ type: "success", text: "已复制到剪贴板" });
         } catch (error) {
             setMessage({ type: "error", text: "复制失败" });

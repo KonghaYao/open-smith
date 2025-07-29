@@ -45,6 +45,7 @@
         "@types/uuid": "^10.0.0",
         "@unocss/reset": "^66.3.3",
         "chart.js": "^4.5.0",
+        "copy-to-clipboard": "^3.3.3",
         "json-schema-to-typescript-lite": "^14.0.0",
         "lucide-solid": "^0.526.0",
         "ofetch": "^1.4.1",

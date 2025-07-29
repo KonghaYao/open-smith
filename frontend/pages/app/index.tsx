@@ -26,6 +26,7 @@ export const App = () => {
 
     // 搜索相关状态
     const [searchQuery, setSearchQuery] = createSignal("");
+    const [limit, setLimit] = createSignal(50); // 新增 limit 状态，默认 100 条
 
     // 使用 createResource 获取线程概览列表
     const [allThreads, { refetch: refetchThreads }] = createResource(
@@ -33,6 +34,7 @@ export const App = () => {
             refresh: refreshTrigger(),
             system: selectedSystem(),
             search: searchQuery(),
+            limit: limit(), // 传递 limit 参数
         }), // 依赖 refreshTrigger、selectedSystem 和 search 触发刷新
         async (params) => {
             // 构建查询参数
@@ -44,6 +46,10 @@ export const App = () => {
 
             if (params.search && params.search.trim()) {
                 queryParams.append("thread_id", params.search.trim());
+            }
+
+            if (params.limit) {
+                queryParams.append("limit", params.limit.toString());
             }
 
             const response = await ofetch<{ threads: TraceOverview[] }>(

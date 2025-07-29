@@ -18,7 +18,7 @@ import {
     X,
 } from "lucide-solid";
 import type { RunRecord } from "../../../src/types.js";
-
+import copy from "copy-to-clipboard";
 // 定义类型接口
 interface LlmRunFilters {
     run_type?: string;
@@ -34,18 +34,6 @@ interface ColumnConfig {
     format: (run: RunRecord) => JSXElement;
     className: string;
 }
-
-const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(
-        () => {
-            console.log("Copied to clipboard:", text);
-            // 可以添加一个简单的视觉反馈，例如改变图标或显示一个临时消息
-        },
-        (err) => {
-            console.error("Failed to copy:", err);
-        }
-    );
-};
 
 const formatTimeToFirstToken = (timeMs: number) => {
     if (!timeMs || timeMs <= 0) return "-";
@@ -66,7 +54,7 @@ const columnsConfig: ColumnConfig[] = [
                     </div>
                     {run.thread_id && (
                         <button
-                            onClick={() => copyToClipboard(run.thread_id!)}
+                            onClick={() => copy(run.thread_id!)}
                             class="text-sm text-gray-500 hover:text-gray-700 transition-colors"
                             title="复制 会话 ID">
                             <Copy class="inline-block w-3 h-3 mr-1" />
@@ -83,7 +71,7 @@ const columnsConfig: ColumnConfig[] = [
                     </div>
                     {run.trace_id && (
                         <button
-                            onClick={() => copyToClipboard(run.trace_id!)}
+                            onClick={() => copy(run.trace_id!)}
                             class="text-sm text-gray-500 hover:text-gray-700 transition-colors"
                             title="复制 多轮对话 ID">
                             <Copy class="inline-block w-3 h-3 mr-1" />
@@ -144,7 +132,7 @@ const columnsConfig: ColumnConfig[] = [
             <span class="text-sm font-mono text-gray-700">
                 {formatDuration(
                     run.start_time.toString(),
-                    run.end_time.toString()
+                    run.end_time?.toString()
                 )}
             </span>
         ),
@@ -298,10 +286,12 @@ export const LlmRecords = () => {
 
     const handlePrevPage = () => {
         setCurrentPage((prev) => Math.max(1, prev - 1));
+        refetchLlmRuns(); // 强制刷新数据
     };
 
     const handleNextPage = () => {
         setCurrentPage((prev) => Math.min(totalPages(), prev + 1));
+        refetchLlmRuns(); // 强制刷新数据
     };
 
     const [selectedRun, setSelectedRun] = createSignal<RunRecord | null>(null);
@@ -322,6 +312,7 @@ export const LlmRecords = () => {
     const handleSearch = () => {
         setFilters(tempFilters());
         setCurrentPage(1); // 重置到第一页
+        refetchLlmRuns(); // 强制刷新数据
     };
 
     // 清除过滤条件
@@ -442,12 +433,12 @@ export const LlmRecords = () => {
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">
-                                    线程ID
+                                    会话 ID
                                 </label>
                                 <input
                                     type="text"
                                     class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                    placeholder="请输入线程ID..."
+                                    placeholder="请输入会话 ID..."
                                     value={tempFilters().thread_id}
                                     onInput={(e) =>
                                         handleTempFilterChange(

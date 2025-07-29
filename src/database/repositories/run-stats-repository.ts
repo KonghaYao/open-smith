@@ -38,7 +38,9 @@ export class RunStatsRepository {
         const stmt = await this.adapter.prepare(`
             SELECT model_name, system, error, start_time, end_time, total_tokens, time_to_first_token, user_id
             FROM runs
-            WHERE start_time >= ? AND start_time < ?
+            WHERE start_time >= ${this.adapter.getPlaceholder(
+                1
+            )} AND start_time < ${this.adapter.getPlaceholder(2)}
         `);
 
         return stmt.all([startTime.toString(), endTime.toString()]);
@@ -149,28 +151,77 @@ export class RunStatsRepository {
                 total_duration_ms, avg_duration_ms, p95_duration_ms, p99_duration_ms,
                 total_tokens_sum, avg_tokens_per_run, avg_ttft_ms, p95_ttft_ms,
                 distinct_users
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(stat_hour, model_name, system) DO UPDATE SET
-                total_runs = excluded.total_runs,
-                successful_runs = excluded.successful_runs,
-                failed_runs = excluded.failed_runs,
-                error_rate = excluded.error_rate,
-                total_duration_ms = excluded.total_duration_ms,
-                avg_duration_ms = excluded.avg_duration_ms,
-                p95_duration_ms = excluded.p95_duration_ms,
-                p99_duration_ms = excluded.p99_duration_ms,
-                total_tokens_sum = excluded.total_tokens_sum,
-                avg_tokens_per_run = excluded.avg_tokens_per_run,
-                avg_ttft_ms = excluded.avg_ttft_ms,
-                p95_ttft_ms = excluded.p95_ttft_ms,
-                distinct_users = excluded.distinct_users
+            ) VALUES (
+                ${this.adapter.getPlaceholder(1)}, 
+                ${this.adapter.getPlaceholder(2)}, 
+                ${this.adapter.getPlaceholder(3)}, 
+                ${this.adapter.getPlaceholder(4)}, 
+                ${this.adapter.getPlaceholder(5)}, 
+                ${this.adapter.getPlaceholder(6)}, 
+                ${this.adapter.getPlaceholder(7)}, 
+                ${this.adapter.getPlaceholder(8)}, 
+                ${this.adapter.getPlaceholder(9)}, 
+                ${this.adapter.getPlaceholder(10)}, 
+                ${this.adapter.getPlaceholder(11)}, 
+                ${this.adapter.getPlaceholder(12)}, 
+                ${this.adapter.getPlaceholder(13)}, 
+                ${this.adapter.getPlaceholder(14)}, 
+                ${this.adapter.getPlaceholder(15)}, 
+                ${this.adapter.getPlaceholder(16)}
+            )
+            ON CONFLICT(stat_hour, run_type, model_name, system) DO UPDATE SET
+                total_runs = ${this.adapter.getPlaceholder(17)},
+                successful_runs = ${this.adapter.getPlaceholder(18)},
+                failed_runs = ${this.adapter.getPlaceholder(19)},
+                error_rate = ${this.adapter.getPlaceholder(20)},
+                total_duration_ms = ${this.adapter.getPlaceholder(21)},
+                avg_duration_ms = ${this.adapter.getPlaceholder(22)},
+                p95_duration_ms = ${this.adapter.getPlaceholder(23)},
+                p99_duration_ms = ${this.adapter.getPlaceholder(24)},
+                total_tokens_sum = ${this.adapter.getPlaceholder(25)},
+                avg_tokens_per_run = ${this.adapter.getPlaceholder(26)},
+                avg_ttft_ms = ${this.adapter.getPlaceholder(27)},
+                p95_ttft_ms = ${this.adapter.getPlaceholder(28)},
+                distinct_users = ${this.adapter.getPlaceholder(29)}
         `);
-        await stmt.run(Object.values(stats));
+        await stmt.run([
+            stats.stat_hour,
+            stats.model_name,
+            stats.system,
+            stats.total_runs,
+            stats.successful_runs,
+            stats.failed_runs,
+            stats.error_rate,
+            stats.total_duration_ms,
+            stats.avg_duration_ms,
+            stats.p95_duration_ms,
+            stats.p99_duration_ms,
+            stats.total_tokens_sum,
+            stats.avg_tokens_per_run,
+            stats.avg_ttft_ms,
+            stats.p95_ttft_ms,
+            stats.distinct_users,
+            stats.total_runs,
+            stats.successful_runs,
+            stats.failed_runs,
+            stats.error_rate,
+            stats.total_duration_ms,
+            stats.avg_duration_ms,
+            stats.p95_duration_ms,
+            stats.p99_duration_ms,
+            stats.total_tokens_sum,
+            stats.avg_tokens_per_run,
+            stats.avg_ttft_ms,
+            stats.p95_ttft_ms,
+            stats.distinct_users,
+        ]);
     }
 
     private async ensureStatsForHour(hour: string): Promise<void> {
         const existingStmt = await this.adapter.prepare(`
-            SELECT 1 FROM run_stats_hourly WHERE stat_hour = ? LIMIT 1
+            SELECT 1 FROM run_stats_hourly WHERE stat_hour = ${this.adapter.getPlaceholder(
+                1
+            )} LIMIT 1
         `);
         const existing = await existingStmt.get([hour]);
 
@@ -204,15 +255,21 @@ export class RunStatsRepository {
 
         await Promise.all(promises);
 
-        const where: string[] = ["stat_hour >= ?", "stat_hour < ?"];
+        let paramIndex = 1;
+        const where: string[] = [
+            `stat_hour >= ${this.adapter.getPlaceholder(paramIndex++)}`,
+            `stat_hour < ${this.adapter.getPlaceholder(paramIndex++)}`,
+        ];
         const params: any[] = [startTime, endTime];
 
         if (filters.model_name) {
-            where.push("model_name = ?");
+            where.push(
+                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`
+            );
             params.push(filters.model_name);
         }
         if (filters.system) {
-            where.push("system = ?");
+            where.push(`system = ${this.adapter.getPlaceholder(paramIndex++)}`);
             params.push(filters.system);
         }
 

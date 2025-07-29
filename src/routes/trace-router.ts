@@ -31,6 +31,12 @@ export function createTraceRouter(db: TraceDatabase) {
         try {
             const system = c.req.query("system");
             const threadId = c.req.query("thread_id");
+            const limit = c.req.query("limit")
+                ? parseInt(c.req.query("limit") || "")
+                : undefined;
+            const offset = c.req.query("offset")
+                ? parseInt(c.req.query("offset") || "")
+                : undefined;
 
             // 构建过滤条件
             const filters: { system?: string; thread_id?: string } = {};
@@ -39,7 +45,9 @@ export function createTraceRouter(db: TraceDatabase) {
 
             // 使用统一的查询方法
             const threadOverviews = await db.getThreadOverviews(
-                Object.keys(filters).length > 0 ? filters : undefined
+                Object.keys(filters).length > 0 ? filters : undefined,
+                limit,
+                offset
             );
 
             return c.json({

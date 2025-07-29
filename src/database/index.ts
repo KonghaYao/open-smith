@@ -266,11 +266,15 @@ export class TraceDatabase extends BaseDatabase {
         return this.traceRepo.getTracesByUserId(userId);
     }
 
-    async getThreadOverviews(filters?: {
-        system?: string;
-        thread_id?: string;
-    }): Promise<Array<TraceOverview>> {
-        return this.traceRepo.getThreadOverviews(filters);
+    async getThreadOverviews(
+        filters?: {
+            system?: string;
+            thread_id?: string;
+        },
+        limit?: number,
+        offset?: number
+    ): Promise<Array<TraceOverview>> {
+        return this.traceRepo.getThreadOverviews(filters, limit, offset);
     }
 
     async getTracesByConditions(
