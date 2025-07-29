@@ -19,6 +19,7 @@ import {
 } from "lucide-solid";
 import type { RunRecord } from "../../../src/types.js";
 import copy from "copy-to-clipboard";
+import { A, Navigate } from "@solidjs/router";
 // 定义类型接口
 interface LlmRunFilters {
     run_type?: string;
@@ -52,6 +53,7 @@ const columnsConfig: ColumnConfig[] = [
                     <div class="text-xs text-gray-400 uppercase tracking-wide">
                         会话
                     </div>
+
                     {run.thread_id && (
                         <button
                             onClick={() => copy(run.thread_id!)}
@@ -63,7 +65,16 @@ const columnsConfig: ColumnConfig[] = [
                     )}
                 </div>
                 <div class="text-sm font-mono text-gray-700 break-all">
-                    {run.thread_id || "-"}
+                    {run.thread_id || "-"}{" "}
+                    {run.thread_id && (
+                        <A
+                            href={`/?thread_id=${run.thread_id}`}
+                            class="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                            title="查看会话">
+                            <ArrowRight class="inline-block w-3 h-3 mr-1" />
+                            查看
+                        </A>
+                    )}
                 </div>
                 <div class="flex items-center space-x-2">
                     <div class="text-xs text-gray-400 uppercase tracking-wide">
@@ -81,6 +92,15 @@ const columnsConfig: ColumnConfig[] = [
                 </div>
                 <div class="text-sm font-mono text-gray-700 break-all">
                     {run.trace_id || "-"}
+                    {run.trace_id && (
+                        <A
+                            href={`/?thread_id=${run.thread_id}&trace_id=${run.trace_id}`}
+                            class="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                            title="查看会话">
+                            <ArrowRight class="inline-block w-3 h-3 mr-1" />
+                            查看
+                        </A>
+                    )}
                 </div>
             </div>
         ),

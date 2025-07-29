@@ -1,10 +1,11 @@
-import { createSignal, createResource } from "solid-js";
+import { createSignal, createResource, onMount } from "solid-js";
 import { TraceList } from "./TraceList.jsx";
 import { RunsList } from "./RunsList.jsx";
 import { RunDetails } from "./RunDetails.jsx";
 import { createStoreSignal } from "../../utils.jsx";
 import { ofetch } from "../../api.js";
 import type { TraceInfo, TraceOverview } from "../../../src/types.js";
+import { useSearchParams } from "@solidjs/router";
 // 主 App 组件
 export const App = () => {
     // 状态
@@ -23,11 +24,25 @@ export const App = () => {
     // 刷新相关
     const [refreshTrigger, setRefreshTrigger] = createSignal(0);
     const refresh = () => setRefreshTrigger((t) => t + 1);
-
+    const [qs] = useSearchParams<{
+        thread_id: string;
+        trace_id: string;
+    }>();
     // 搜索相关状态
-    const [searchQuery, setSearchQuery] = createSignal("");
+    const [searchQuery, setSearchQuery] = createSignal(qs.thread_id || "");
     const [limit, setLimit] = createSignal(50); // 新增 limit 状态，默认 100 条
 
+    // 组件加载时检查 URL 参数
+    onMount(() => {
+        const threadIdFromUrl = qs.thread_id;
+        if (threadIdFromUrl) {
+            setSearchQuery(threadIdFromUrl as string);
+            setSelectedThreadId(threadIdFromUrl as string);
+        }
+        if (qs.trace_id) {
+            setSelectedTraceId(qs.trace_id as string);
+        }
+    });
     // 使用 createResource 获取线程概览列表
     const [allThreads, { refetch: refetchThreads }] = createResource(
         () => ({
@@ -70,6 +85,11 @@ export const App = () => {
                     params.threadId
                 )}`
             );
+            if (response.data.length > 0 && !selectedTraceId()) {
+                setSelectedTraceId(
+                    response.data[response.data.length - 1].trace_id
+                );
+            }
             return response.data || [];
         }
     );
