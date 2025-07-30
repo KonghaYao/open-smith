@@ -141,14 +141,10 @@ const StatsPage = (): JSX.Element => {
 
     const [availableFilters] = createResource(async () => {
         try {
-            const [models, systems, traces] = await Promise.all([
+            const [models, systems] = await Promise.all([
                 ofetch("/trace/models"),
                 ofetch("/trace/systems"),
-                ofetch("/trace"), // Still fetch traces for now if needed elsewhere
             ]);
-            // const runTypes = [
-            //     ...new Set(traces.traces.flatMap((t: any) => t.run_types)),
-            // ];
             return {
                 modelNames: (models.model_names || []) as string[],
                 systems: (systems.systems || []) as string[],
