@@ -104,7 +104,6 @@ export class BaseDatabase {
         await this.adapter.exec(`
             CREATE TABLE IF NOT EXISTS run_stats_hourly (
                 stat_hour TEXT NOT NULL,
-                run_type TEXT,
                 model_name TEXT,
                 system TEXT,
                 total_runs INTEGER NOT NULL DEFAULT 0,
@@ -120,7 +119,7 @@ export class BaseDatabase {
                 avg_ttft_ms INTEGER,
                 p95_ttft_ms INTEGER,
                 distinct_users INTEGER,
-                PRIMARY KEY (stat_hour, run_type, model_name, system)
+                PRIMARY KEY (stat_hour, model_name, system)
             )
         `);
 

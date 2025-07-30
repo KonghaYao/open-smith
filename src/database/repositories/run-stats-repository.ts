@@ -2,7 +2,7 @@ import type { DatabaseAdapter } from "../interfaces.js";
 import type { RunStatsHourlyRecord } from "../../types.js";
 
 export class RunStatsRepository {
-    constructor(private adapter: DatabaseAdapter) {}
+    constructor(private adapter: DatabaseAdapter) { }
 
     /**
      * 更新指定小时的运行统计数据
@@ -39,8 +39,8 @@ export class RunStatsRepository {
             SELECT model_name, system, error, start_time, end_time, total_tokens, time_to_first_token, user_id
             FROM runs
             WHERE start_time >= ${this.adapter.getPlaceholder(
-                1
-            )} AND start_time < ${this.adapter.getPlaceholder(2)}
+            1
+        )} AND start_time < ${this.adapter.getPlaceholder(2)}
         `);
 
         return stmt.all([startTime.toString(), endTime.toString()]);
@@ -169,7 +169,7 @@ export class RunStatsRepository {
                 ${this.adapter.getPlaceholder(15)}, 
                 ${this.adapter.getPlaceholder(16)}
             )
-            ON CONFLICT(stat_hour, run_type, model_name, system) DO UPDATE SET
+            ON CONFLICT(stat_hour, model_name, system) DO UPDATE SET
                 total_runs = ${this.adapter.getPlaceholder(17)},
                 successful_runs = ${this.adapter.getPlaceholder(18)},
                 failed_runs = ${this.adapter.getPlaceholder(19)},
@@ -220,8 +220,8 @@ export class RunStatsRepository {
     private async ensureStatsForHour(hour: string): Promise<void> {
         const existingStmt = await this.adapter.prepare(`
             SELECT 1 FROM run_stats_hourly WHERE stat_hour = ${this.adapter.getPlaceholder(
-                1
-            )} LIMIT 1
+            1
+        )} LIMIT 1
         `);
         const existing = await existingStmt.get([hour]);
 
@@ -244,16 +244,13 @@ export class RunStatsRepository {
         // 将 start time 对齐到小时的开始
         start.setUTCMinutes(0, 0, 0);
 
-        const promises: Promise<void>[] = [];
         const current = new Date(start);
 
         while (current < end) {
             const hourString = current.toISOString();
-            promises.push(this.ensureStatsForHour(hourString));
+            await this.ensureStatsForHour(hourString)
             current.setUTCHours(current.getUTCHours() + 1);
         }
-
-        await Promise.all(promises);
 
         let paramIndex = 1;
         const where: string[] = [
