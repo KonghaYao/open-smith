@@ -1,5 +1,12 @@
 import { type JSXElement } from "solid-js";
-import { createSignal, createResource, For, Show, createMemo } from "solid-js";
+import {
+    createSignal,
+    createResource,
+    For,
+    Show,
+    createMemo,
+    onMount,
+} from "solid-js";
 import { RunDetailsPanel } from "./RunDetailsPanel.jsx";
 import { DateRangePicker } from "./DateRangePicker.js";
 import { ofetch } from "../../api.js";
@@ -21,7 +28,7 @@ import {
 } from "lucide-solid";
 import type { RunRecord } from "../../../src/types.js";
 import copy from "copy-to-clipboard";
-import { A, Navigate } from "@solidjs/router";
+import { A, Navigate, useSearchParams } from "@solidjs/router";
 // 定义类型接口
 interface LlmRunFilters {
     run_type?: string;
@@ -312,27 +319,28 @@ interface RunDataResponse {
 export const LlmRecords = () => {
     const [currentPage, setCurrentPage] = createSignal(1);
     const [itemsPerPage, setItemsPerPage] = createSignal(10);
+    const [searchParams] = useSearchParams(); // 获取 URL 查询参数
 
     // 过滤条件
     const [filters, setFilters] = createSignal<LlmRunFilters>({
-        run_type: "llm", // 默认查询 LLM runs
-        system: "",
-        model_name: "",
-        thread_id: "",
-        user_id: "", // 添加 user_id 过滤条件
-        start_time_after: "", // 初始化
-        start_time_before: "", // 初始化
+        run_type: (searchParams.run_type as string) || "llm",
+        system: (searchParams.system as string) || "",
+        model_name: (searchParams.model_name as string) || "",
+        thread_id: (searchParams.thread_id as string) || "",
+        user_id: (searchParams.user_id as string) || "",
+        start_time_after: (searchParams.start_time_after as string) || "",
+        start_time_before: (searchParams.start_time_before as string) || "",
     });
 
     // 临时过滤条件（用于输入）
     const [tempFilters, setTempFilters] = createSignal<LlmRunFilters>({
-        run_type: "llm",
-        system: "",
-        model_name: "",
-        thread_id: "",
-        user_id: "", // 添加 user_id 临时过滤条件
-        start_time_after: "", // 初始化
-        start_time_before: "", // 初始化
+        run_type: (searchParams.run_type as string) || "llm",
+        system: (searchParams.system as string) || "",
+        model_name: (searchParams.model_name as string) || "",
+        thread_id: (searchParams.thread_id as string) || "",
+        user_id: (searchParams.user_id as string) || "",
+        start_time_after: (searchParams.start_time_after as string) || "",
+        start_time_before: (searchParams.start_time_before as string) || "",
     });
 
     // 资源加载

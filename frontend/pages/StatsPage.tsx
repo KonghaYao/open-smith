@@ -12,6 +12,7 @@ import type { RunStatsHourlyRecord } from "../../src/types.js";
 import { Table, type TableColumn } from "../components/Table.js";
 import { Chart } from "../components/Chart.js";
 import type { ChartConfiguration } from "chart.js";
+import { A } from "@solidjs/router";
 
 const sevenDaysAgo = (): Date => {
     const d = new Date();
@@ -489,7 +490,18 @@ const StatsPage = (): JSX.Element => {
             header: "小时",
             key: "stat_hour",
             class: "px-6 py-4 whitespace-nowrap text-sm text-gray-900",
-            format: (row) => new Date(row.stat_hour).toLocaleString(),
+            format: (row) => {
+                const startTime = new Date(row.stat_hour);
+                const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // Add 1 hour
+
+                return (
+                    <A
+                        href={`/llm-records?start_time_after=${startTime.toISOString()}&start_time_before=${endTime.toISOString()}`}
+                        class="text-blue-600 hover:underline">
+                        {new Date(row.stat_hour).toLocaleString()}
+                    </A>
+                );
+            },
         },
         {
             header: "模型",
