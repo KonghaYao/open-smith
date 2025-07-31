@@ -429,6 +429,8 @@ export class RunRepository {
             thread_id?: string;
             user_id?: string;
             tag?: string;
+            start_time_after?: string;
+            start_time_before?: string;
         },
         limit: number,
         offset: number
@@ -475,6 +477,18 @@ export class RunRepository {
             );
             values.push(`%"${conditions.tag}"%`);
         }
+        if (conditions.start_time_after) {
+            whereConditions.push(
+                `start_time >= ${this.adapter.getPlaceholder(paramIndex++)}`
+            );
+            values.push(new Date(conditions.start_time_after).getTime());
+        }
+        if (conditions.start_time_before) {
+            whereConditions.push(
+                `start_time <= ${this.adapter.getPlaceholder(paramIndex++)}`
+            );
+            values.push(new Date(conditions.start_time_before).getTime());
+        }
 
         const whereClause =
             whereConditions.length > 0
@@ -501,6 +515,8 @@ export class RunRepository {
         thread_id?: string;
         user_id?: string;
         tag?: string;
+        start_time_after?: string;
+        start_time_before?: string;
     }): Promise<number> {
         const whereConditions: string[] = [];
         const values: any[] = [];
@@ -543,6 +559,18 @@ export class RunRepository {
                 )}`
             );
             values.push(`%"${conditions.tag}"%`);
+        }
+        if (conditions.start_time_after) {
+            whereConditions.push(
+                `start_time >= ${this.adapter.getPlaceholder(paramIndex++)}`
+            );
+            values.push(new Date(conditions.start_time_after).getTime());
+        }
+        if (conditions.start_time_before) {
+            whereConditions.push(
+                `start_time <= ${this.adapter.getPlaceholder(paramIndex++)}`
+            );
+            values.push(new Date(conditions.start_time_before).getTime());
         }
 
         const whereClause =

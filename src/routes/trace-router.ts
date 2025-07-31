@@ -221,6 +221,8 @@ export function createTraceRouter(db: TraceDatabase) {
         const modelName = c.req.query("model_name");
         const limit = parseInt(c.req.query("limit") || "20");
         const offset = parseInt(c.req.query("offset") || "0");
+        const startTimeAfter = c.req.query("start_time_after"); // 新增
+        const startTimeBefore = c.req.query("start_time_before"); // 新增
 
         // 验证类型参数
         if (type !== "traces" && type !== "runs") {
@@ -240,6 +242,8 @@ export function createTraceRouter(db: TraceDatabase) {
         if (userId) conditions.user_id = userId;
         if (runType) conditions.run_type = runType;
         if (modelName) conditions.model_name = modelName;
+        if (startTimeAfter) conditions.start_time_after = startTimeAfter; // 新增
+        if (startTimeBefore) conditions.start_time_before = startTimeBefore; // 新增
 
         try {
             let data, total;

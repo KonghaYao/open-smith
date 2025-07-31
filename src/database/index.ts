@@ -186,6 +186,8 @@ export class TraceDatabase extends BaseDatabase {
             thread_id?: string;
             user_id?: string;
             tag?: string;
+            start_time_after?: string; // 新增
+            start_time_before?: string; // 新增
         },
         limit: number,
         offset: number
@@ -200,6 +202,8 @@ export class TraceDatabase extends BaseDatabase {
         thread_id?: string;
         user_id?: string;
         tag?: string;
+        start_time_after?: string; // 新增
+        start_time_before?: string; // 新增
     }): Promise<number> {
         return this.runRepo.countRunsByConditions(conditions);
     }

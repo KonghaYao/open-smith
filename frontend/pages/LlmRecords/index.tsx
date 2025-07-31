@@ -1,11 +1,13 @@
 import { type JSXElement } from "solid-js";
 import { createSignal, createResource, For, Show, createMemo } from "solid-js";
 import { RunDetailsPanel } from "./RunDetailsPanel.jsx";
+import { DateRangePicker } from "./DateRangePicker.js";
 import { ofetch } from "../../api.js";
 import {
     formatDuration,
     formatTimestamp as formatUnixTimestamp,
 } from "../../utils.js";
+import { getColorFromString } from "../../utils/color.js";
 import {
     ArrowLeft,
     ArrowRight,
@@ -27,6 +29,8 @@ interface LlmRunFilters {
     model_name?: string;
     thread_id?: string;
     user_id?: string;
+    start_time_after?: string; // 添加开始时间过滤
+    start_time_before?: string; // 添加结束时间过滤
 }
 
 interface ColumnConfig {
@@ -120,7 +124,12 @@ const columnsConfig: ColumnConfig[] = [
                 <div class="text-xs text-gray-400 uppercase tracking-wide">
                     系统
                 </div>
-                <div class="text-sm text-gray-600">{run.system || "-"}</div>
+                <div
+                    class={`text-sm text-gray-600 border rounded text-center w-fit px-2 ${getColorFromString(
+                        run.system || ""
+                    )}`}>
+                    {run.system || "-"}
+                </div>
             </div>
         ),
         className: "px-4 py-3 border-b border-gray-100",
@@ -129,10 +138,45 @@ const columnsConfig: ColumnConfig[] = [
         header: "模型名称",
         key: "model_name",
         format: (run) => (
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+            <span
+                class={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getColorFromString(
+                    run.model_name || ""
+                )}`}>
                 {run.model_name || "-"}
             </span>
         ),
+        className: "px-4 py-3 border-b border-gray-100",
+    },
+    {
+        header: "内容",
+        key: "outputs",
+        format: (run) => {
+            let message = "";
+            try {
+                const content = JSON.parse(
+                    run.outputs || "{}"
+                ).generations?.[0]?.map((i: any) => i.message)[0].kwargs
+                    .content;
+                if (typeof content === "string") {
+                    message = content;
+                } else if (Array.isArray(content)) {
+                    message =
+                        content.find((i: any) => i.type === "text")?.text ||
+                        "-";
+                } else {
+                    message = "-";
+                }
+            } catch (e) {
+                message = "-";
+            }
+            return (
+                <span
+                    class="block items-center px-2.5 py-0.5 rounded-full text-xs font-medium overflow-hidden text-ellipsis max-w-40 max-w-[10rem] whitespace-normal leading-[1.4em] h-[2.8em]"
+                    title={message}>
+                    {message}
+                </span>
+            );
+        },
         className: "px-4 py-3 border-b border-gray-100",
     },
     {
@@ -172,7 +216,10 @@ const columnsConfig: ColumnConfig[] = [
         header: "用户 ID",
         key: "user_id",
         format: (run) => (
-            <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200">
+            <span
+                class={`inline-flex items-center px-2 py-1 rounded text-xs font-medium border ${getColorFromString(
+                    run.user_id || ""
+                )}`}>
                 {run.user_id || "-"}
             </span>
         ),
@@ -232,6 +279,10 @@ const fetchLlmRuns = async ([currentPage, itemsPerPage, filters]: [
         queryParams.append("model_name", filters.model_name);
     if (filters.thread_id) queryParams.append("thread_id", filters.thread_id);
     if (filters.user_id) queryParams.append("user_id", filters.user_id);
+    if (filters.start_time_after)
+        queryParams.append("start_time_after", filters.start_time_after);
+    if (filters.start_time_before)
+        queryParams.append("start_time_before", filters.start_time_before);
 
     try {
         // 使用新的搜索接口
@@ -269,6 +320,8 @@ export const LlmRecords = () => {
         model_name: "",
         thread_id: "",
         user_id: "", // 添加 user_id 过滤条件
+        start_time_after: "", // 初始化
+        start_time_before: "", // 初始化
     });
 
     // 临时过滤条件（用于输入）
@@ -278,6 +331,8 @@ export const LlmRecords = () => {
         model_name: "",
         thread_id: "",
         user_id: "", // 添加 user_id 临时过滤条件
+        start_time_after: "", // 初始化
+        start_time_before: "", // 初始化
     });
 
     // 资源加载
@@ -343,6 +398,8 @@ export const LlmRecords = () => {
             model_name: "",
             thread_id: "",
             user_id: "", // 清除 user_id 过滤条件
+            start_time_after: "", // 清除时间过滤
+            start_time_before: "", // 清除时间过滤
         };
         setTempFilters(defaultFilters);
         setFilters(defaultFilters);
@@ -481,6 +538,27 @@ export const LlmRecords = () => {
                                         handleTempFilterChange(
                                             "user_id",
                                             e.currentTarget.value
+                                        )
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    起始时间 (起)
+                                </label>
+                                <DateRangePicker
+                                    startTime={tempFilters().start_time_after!}
+                                    endTime={tempFilters().start_time_before!}
+                                    onStartTimeChange={(value) =>
+                                        handleTempFilterChange(
+                                            "start_time_after",
+                                            value
+                                        )
+                                    }
+                                    onEndTimeChange={(value) =>
+                                        handleTempFilterChange(
+                                            "start_time_before",
+                                            value
                                         )
                                     }
                                 />
