@@ -1,6 +1,24 @@
 import type { DatabaseAdapter } from "../interfaces.js";
 import type { TraceOverview } from "../../types.js";
 
+type RawTrace = {
+    trace_id: string;
+    total_runs: number;
+    first_run_time: string;
+    last_run_time: string;
+    run_types: string;
+    systems: string;
+    total_tokens_sum: number;
+    user_id?: string;
+    thread_id?: string;
+    total_traces?: number;
+    user_ids?: string;
+};
+
+type CountResult = {
+    count: number;
+};
+
 export class TraceRepository {
     constructor(private adapter: DatabaseAdapter) {}
 
@@ -15,12 +33,12 @@ export class TraceRepository {
                 ${this.adapter.getStringAggregateFunction(
                     "run_type",
                     true,
-                    ","
+                    ",",
                 )} as run_types,
                 ${this.adapter.getStringAggregateFunction(
                     "system",
                     true,
-                    ","
+                    ",",
                 )} as systems,
                 SUM(total_tokens) as total_tokens_sum
             FROM runs 
@@ -29,14 +47,14 @@ export class TraceRepository {
             ORDER BY MAX(created_at) DESC
         `);
 
-        const traces = (await stmt.all()) as any[];
+        const traces = (await stmt.all()) as RawTrace[];
 
         return Promise.all(
-            traces.map(async (trace: any) => {
+            traces.map(async (trace) => {
                 // 获取该 trace 的 feedback 和 attachments 统计
                 const feedbackStmt = await this.adapter.prepare(`
                 SELECT COUNT(*) as count FROM feedback WHERE trace_id = ${this.adapter.getPlaceholder(
-                    1
+                    1,
                 )}
             `);
                 const attachmentStmt = await this.adapter.prepare(`
@@ -48,10 +66,10 @@ export class TraceRepository {
 
                 const feedbackCount = (await feedbackStmt.get([
                     trace.trace_id,
-                ])) as any;
+                ])) as CountResult;
                 const attachmentCount = (await attachmentStmt.get([
                     trace.trace_id,
-                ])) as any;
+                ])) as CountResult;
 
                 return {
                     trace_id: trace.trace_id,
@@ -68,7 +86,7 @@ export class TraceRepository {
                         : [],
                     total_tokens_sum: trace.total_tokens_sum || 0,
                 };
-            })
+            }),
         );
     }
 
@@ -83,30 +101,30 @@ export class TraceRepository {
                 ${this.adapter.getStringAggregateFunction(
                     "run_type",
                     true,
-                    ","
+                    ",",
                 )} as run_types,
                 ${this.adapter.getStringAggregateFunction(
                     "system",
                     true,
-                    ","
+                    ",",
                 )} as systems,
                 SUM(total_tokens) as total_tokens_sum
             FROM runs 
             WHERE trace_id IS NOT NULL AND system = ${this.adapter.getPlaceholder(
-                1
+                1,
             )}
             GROUP BY trace_id 
             ORDER BY MAX(created_at) DESC
         `);
 
-        const traces = (await stmt.all([system])) as any[];
+        const traces = (await stmt.all([system])) as RawTrace[];
 
         return Promise.all(
-            traces.map(async (trace: any) => {
+            traces.map(async (trace) => {
                 // 获取该 trace 的 feedback 和 attachments 统计
                 const feedbackStmt = await this.adapter.prepare(`
                 SELECT COUNT(*) as count FROM feedback WHERE trace_id = ${this.adapter.getPlaceholder(
-                    1
+                    1,
                 )}
             `);
                 const attachmentStmt = await this.adapter.prepare(`
@@ -118,10 +136,10 @@ export class TraceRepository {
 
                 const feedbackCount = (await feedbackStmt.get([
                     trace.trace_id,
-                ])) as any;
+                ])) as CountResult;
                 const attachmentCount = (await attachmentStmt.get([
                     trace.trace_id,
-                ])) as any;
+                ])) as CountResult;
 
                 return {
                     trace_id: trace.trace_id,
@@ -138,7 +156,7 @@ export class TraceRepository {
                         : [],
                     total_tokens_sum: trace.total_tokens_sum || 0,
                 };
-            })
+            }),
         );
     }
 
@@ -153,31 +171,31 @@ export class TraceRepository {
                 ${this.adapter.getStringAggregateFunction(
                     "run_type",
                     true,
-                    ","
+                    ",",
                 )} as run_types,
                 ${this.adapter.getStringAggregateFunction(
                     "system",
                     true,
-                    ","
+                    ",",
                 )} as systems,
                 SUM(total_tokens) as total_tokens_sum,
                 MIN(user_id) as user_id
             FROM runs 
             WHERE trace_id IS NOT NULL AND thread_id = ${this.adapter.getPlaceholder(
-                1
+                1,
             )}
             GROUP BY trace_id 
             ORDER BY MAX(created_at) DESC
         `);
 
-        const traces = (await stmt.all([threadId])) as any[];
+        const traces = (await stmt.all([threadId])) as RawTrace[];
 
         return Promise.all(
-            traces.map(async (trace: any) => {
+            traces.map(async (trace) => {
                 // 获取该 trace 的 feedback 和 attachments 统计
                 const feedbackStmt = await this.adapter.prepare(`
                 SELECT COUNT(*) as count FROM feedback WHERE trace_id = ${this.adapter.getPlaceholder(
-                    1
+                    1,
                 )}
             `);
                 const attachmentStmt = await this.adapter.prepare(`
@@ -189,10 +207,10 @@ export class TraceRepository {
 
                 const feedbackCount = (await feedbackStmt.get([
                     trace.trace_id,
-                ])) as any;
+                ])) as CountResult;
                 const attachmentCount = (await attachmentStmt.get([
                     trace.trace_id,
-                ])) as any;
+                ])) as CountResult;
 
                 return {
                     trace_id: trace.trace_id,
@@ -210,7 +228,7 @@ export class TraceRepository {
                     total_tokens_sum: trace.total_tokens_sum || 0,
                     user_id: trace.user_id,
                 };
-            })
+            }),
         );
     }
 
@@ -225,30 +243,30 @@ export class TraceRepository {
                 ${this.adapter.getStringAggregateFunction(
                     "run_type",
                     true,
-                    ","
+                    ",",
                 )} as run_types,
                 ${this.adapter.getStringAggregateFunction(
                     "system",
                     true,
-                    ","
+                    ",",
                 )} as systems,
                 SUM(total_tokens) as total_tokens_sum
             FROM runs 
             WHERE trace_id IS NOT NULL AND user_id = ${this.adapter.getPlaceholder(
-                1
+                1,
             )}
             GROUP BY trace_id 
             ORDER BY MAX(created_at) DESC
         `);
 
-        const traces = (await stmt.all([userId])) as any[];
+        const traces = (await stmt.all([userId])) as RawTrace[];
 
         return Promise.all(
-            traces.map(async (trace: any) => {
+            traces.map(async (trace) => {
                 // 获取该 trace 的 feedback 和 attachments 统计
                 const feedbackStmt = await this.adapter.prepare(`
                 SELECT COUNT(*) as count FROM feedback WHERE trace_id = ${this.adapter.getPlaceholder(
-                    1
+                    1,
                 )}
             `);
                 const attachmentStmt = await this.adapter.prepare(`
@@ -260,10 +278,10 @@ export class TraceRepository {
 
                 const feedbackCount = (await feedbackStmt.get([
                     trace.trace_id,
-                ])) as any;
+                ])) as CountResult;
                 const attachmentCount = (await attachmentStmt.get([
                     trace.trace_id,
-                ])) as any;
+                ])) as CountResult;
 
                 return {
                     trace_id: trace.trace_id,
@@ -280,7 +298,7 @@ export class TraceRepository {
                         : [],
                     total_tokens_sum: trace.total_tokens_sum || 0,
                 };
-            })
+            }),
         );
     }
 
@@ -291,10 +309,10 @@ export class TraceRepository {
             thread_id?: string;
         },
         limit?: number,
-        offset?: number
+        offset?: number,
     ): Promise<Array<TraceOverview>> {
         const whereConditions: string[] = [];
-        const values: any[] = [];
+        const values: (string | number)[] = [];
         let paramIndex = 1;
 
         // 基础条件
@@ -303,14 +321,14 @@ export class TraceRepository {
         // 可选过滤条件
         if (filters?.system) {
             whereConditions.push(
-                `system = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `system = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(filters.system);
         }
 
         if (filters?.thread_id) {
             whereConditions.push(
-                `thread_id LIKE ${this.adapter.getPlaceholder(paramIndex++)}`
+                `thread_id LIKE ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(`%${filters.thread_id}%`);
         }
@@ -327,12 +345,12 @@ export class TraceRepository {
                 ${this.adapter.getStringAggregateFunction(
                     "run_type",
                     true,
-                    ","
+                    ",",
                 )} as run_types,
                 ${this.adapter.getStringAggregateFunction(
                     "system",
                     true,
-                    ","
+                    ",",
                 )} as systems,
                 SUM(total_tokens) as total_tokens_sum
             FROM runs 
@@ -358,10 +376,10 @@ export class TraceRepository {
             values.push(offset);
         }
 
-        const threads = (await stmt.all(values)) as any[];
+        const threads = (await stmt.all(values)) as RawTrace[];
 
         return Promise.all(
-            threads.map(async (thread: any) => {
+            threads.map(async (thread) => {
                 // 获取该 thread 的 feedback 和 attachments 统计
                 const feedbackStmt = await this.adapter.prepare(`
                 SELECT COUNT(*) as count 
@@ -378,10 +396,10 @@ export class TraceRepository {
 
                 const feedbackCount = (await feedbackStmt.get([
                     thread.thread_id,
-                ])) as any;
+                ])) as CountResult;
                 const attachmentCount = (await attachmentStmt.get([
                     thread.thread_id,
-                ])) as any;
+                ])) as CountResult;
 
                 return {
                     thread_id: thread.thread_id,
@@ -400,7 +418,7 @@ export class TraceRepository {
                         : [],
                     total_tokens_sum: thread.total_tokens_sum || 0,
                 };
-            })
+            }),
         );
     }
 
@@ -414,39 +432,39 @@ export class TraceRepository {
             model_name?: string;
         },
         limit: number,
-        offset: number
+        offset: number,
     ): Promise<TraceOverview[]> {
         const whereConditions: string[] = [];
-        const values: any[] = [];
+        const values: (string | number)[] = [];
         let paramIndex = 1;
 
         if (conditions.system) {
             whereConditions.push(
-                `system = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `system = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.system);
         }
         if (conditions.thread_id) {
             whereConditions.push(
-                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.thread_id);
         }
         if (conditions.user_id) {
             whereConditions.push(
-                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.user_id);
         }
         if (conditions.run_type) {
             whereConditions.push(
-                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.run_type);
         }
         if (conditions.model_name) {
             whereConditions.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.model_name);
         }
@@ -454,7 +472,7 @@ export class TraceRepository {
         const whereClause =
             whereConditions.length > 0
                 ? `WHERE trace_id IS NOT NULL AND ${whereConditions.join(
-                      " AND "
+                      " AND ",
                   )}`
                 : "WHERE trace_id IS NOT NULL";
 
@@ -469,17 +487,17 @@ export class TraceRepository {
                 ${this.adapter.getStringAggregateFunction(
                     "run_type",
                     true,
-                    ","
+                    ",",
                 )} as run_types,
                 ${this.adapter.getStringAggregateFunction(
                     "system",
                     true,
-                    ","
+                    ",",
                 )} as systems,
                 ${this.adapter.getStringAggregateFunction(
                     "user_id",
                     true,
-                    ","
+                    ",",
                 )} as user_ids,
                 SUM(total_tokens) as total_tokens_sum
             FROM runs 
@@ -490,14 +508,14 @@ export class TraceRepository {
             OFFSET ${this.adapter.getPlaceholder(paramIndex++)}
         `);
 
-        const traces = (await stmt.all(values)) as any[];
+        const traces = (await stmt.all(values)) as RawTrace[];
 
         return Promise.all(
-            traces.map(async (trace: any) => {
+            traces.map(async (trace) => {
                 // 获取该 trace 的 feedback 和 attachments 统计
                 const feedbackStmt = await this.adapter.prepare(`
                 SELECT COUNT(*) as count FROM feedback WHERE trace_id = ${this.adapter.getPlaceholder(
-                    1
+                    1,
                 )}
             `);
                 const attachmentStmt = await this.adapter.prepare(`
@@ -509,10 +527,10 @@ export class TraceRepository {
 
                 const feedbackCount = (await feedbackStmt.get([
                     trace.trace_id,
-                ])) as any;
+                ])) as CountResult;
                 const attachmentCount = (await attachmentStmt.get([
                     trace.trace_id,
-                ])) as any;
+                ])) as CountResult;
 
                 return {
                     trace_id: trace.trace_id,
@@ -524,23 +542,25 @@ export class TraceRepository {
                     run_types: trace.run_types
                         ? Array.from(
                               new Set(
-                                  trace.run_types.split(",").filter(Boolean)
-                              )
+                                  trace.run_types.split(",").filter(Boolean),
+                              ),
                           )
                         : [],
                     systems: trace.systems
                         ? Array.from(
-                              new Set(trace.systems.split(",").filter(Boolean))
+                              new Set(trace.systems.split(",").filter(Boolean)),
                           )
                         : [],
                     user_ids: trace.user_ids
                         ? Array.from(
-                              new Set(trace.user_ids.split(",").filter(Boolean))
+                              new Set(
+                                  trace.user_ids.split(",").filter(Boolean),
+                              ),
                           )
                         : [],
                     total_tokens_sum: trace.total_tokens_sum || 0,
                 };
-            })
+            }),
         );
     }
 
@@ -553,36 +573,36 @@ export class TraceRepository {
         model_name?: string;
     }): Promise<number> {
         const whereConditions: string[] = [];
-        const values: any[] = [];
+        const values: (string | number)[] = [];
         let paramIndex = 1;
 
         if (conditions.system) {
             whereConditions.push(
-                `system = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `system = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.system);
         }
         if (conditions.thread_id) {
             whereConditions.push(
-                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.thread_id);
         }
         if (conditions.user_id) {
             whereConditions.push(
-                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.user_id);
         }
         if (conditions.run_type) {
             whereConditions.push(
-                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.run_type);
         }
         if (conditions.model_name) {
             whereConditions.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.model_name);
         }
@@ -590,7 +610,7 @@ export class TraceRepository {
         const whereClause =
             whereConditions.length > 0
                 ? `WHERE trace_id IS NOT NULL AND ${whereConditions.join(
-                      " AND "
+                      " AND ",
                   )}`
                 : "WHERE trace_id IS NOT NULL";
 
@@ -599,7 +619,7 @@ export class TraceRepository {
             FROM runs
             ${whereClause}
         `);
-        const result = (await stmt.get(values)) as { count: number };
+        const result = (await stmt.get(values)) as CountResult;
         return result.count || 0;
     }
 }

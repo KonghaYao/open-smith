@@ -1,8 +1,19 @@
 import type { DatabaseAdapter } from "../interfaces.js";
 import type { RunStatsHourlyRecord } from "../../types.js";
 
+type RunForStats = {
+    model_name: string | null;
+    system: string | null;
+    error: string | null;
+    start_time: string;
+    end_time: string;
+    total_tokens: number | null;
+    time_to_first_token: number | null;
+    user_id: string | null;
+};
+
 export class RunStatsRepository {
-    constructor(private adapter: DatabaseAdapter) { }
+    constructor(private adapter: DatabaseAdapter) {}
 
     /**
      * 更新指定小时的运行统计数据
@@ -23,7 +34,7 @@ export class RunStatsRepository {
                 const stats = this.calculateStatsForGroup(
                     group,
                     specificHour,
-                    key
+                    key,
                 );
                 await this.upsertStats(stats);
             }
@@ -31,7 +42,7 @@ export class RunStatsRepository {
         await transaction();
     }
 
-    private async getRunsForHour(hour: string): Promise<any[]> {
+    private async getRunsForHour(hour: string): Promise<RunForStats[]> {
         const startTime = new Date(hour).getTime();
         const endTime = startTime + 60 * 60 * 1000;
 
@@ -39,15 +50,15 @@ export class RunStatsRepository {
             SELECT model_name, system, error, start_time, end_time, total_tokens, time_to_first_token, user_id
             FROM runs
             WHERE start_time >= ${this.adapter.getPlaceholder(
-            1
-        )} AND start_time < ${this.adapter.getPlaceholder(2)}
+                1,
+            )} AND start_time < ${this.adapter.getPlaceholder(2)}
         `);
 
         return stmt.all([startTime.toString(), endTime.toString()]);
     }
 
     private normalizeDimension(
-        value: string | null | undefined
+        value: string | null | undefined,
     ): string | null {
         if (
             value === null ||
@@ -60,7 +71,7 @@ export class RunStatsRepository {
         return value;
     }
 
-    private groupRuns(runs: any[]): Record<string, any[]> {
+    private groupRuns(runs: RunForStats[]): Record<string, RunForStats[]> {
         return runs.reduce((acc, run) => {
             const modelName = this.normalizeDimension(run.model_name);
 
@@ -77,13 +88,13 @@ export class RunStatsRepository {
             }
             acc[key].push(run);
             return acc;
-        }, {});
+        }, {} as Record<string, RunForStats[]>);
     }
 
     private calculateStatsForGroup(
-        group: any[],
+        group: RunForStats[],
         statHour: string,
-        key: string
+        key: string,
     ): RunStatsHourlyRecord {
         const total_runs = group.length;
         const failed_runs = group.filter((r) => r.error).length;
@@ -91,7 +102,7 @@ export class RunStatsRepository {
         const error_rate = total_runs > 0 ? failed_runs / total_runs : 0;
 
         const durations = group.map(
-            (r) => parseInt(r.end_time) - parseInt(r.start_time)
+            (r) => parseInt(r.end_time) - parseInt(r.start_time),
         );
         const total_duration_ms = durations.reduce((a, b) => a + b, 0);
         const avg_duration_ms =
@@ -103,13 +114,13 @@ export class RunStatsRepository {
 
         const total_tokens_sum = group.reduce(
             (sum, r) => sum + (r.total_tokens || 0),
-            0
+            0,
         );
         const avg_tokens_per_run =
             total_runs > 0 ? total_tokens_sum / total_runs : 0;
 
         const distinct_users = new Set(
-            group.map((r) => r.user_id).filter(Boolean)
+            group.map((r) => r.user_id).filter(Boolean),
         ).size;
 
         // 计算百分位
@@ -220,12 +231,13 @@ export class RunStatsRepository {
     private async ensureStatsForHour(hour: string): Promise<void> {
         const existingStmt = await this.adapter.prepare(`
             SELECT 1 FROM run_stats_hourly WHERE stat_hour = ${this.adapter.getPlaceholder(
-            1
-        )} LIMIT 1
+                1,
+            )} LIMIT 1
         `);
         const existing = await existingStmt.get([hour]);
 
         if (!existing) {
+            console.log(`Updating stats for hour: ${hour}`);
             await this.updateHourlyStats(hour);
         }
     }
@@ -236,7 +248,7 @@ export class RunStatsRepository {
     async getStats(
         startTime: string,
         endTime: string,
-        filters: { model_name?: string; system?: string }
+        filters: { model_name?: string; system?: string },
     ): Promise<RunStatsHourlyRecord[]> {
         const start = new Date(startTime);
         const end = new Date(endTime);
@@ -248,7 +260,7 @@ export class RunStatsRepository {
 
         while (current < end) {
             const hourString = current.toISOString();
-            await this.ensureStatsForHour(hourString)
+            await this.ensureStatsForHour(hourString);
             current.setUTCHours(current.getUTCHours() + 1);
         }
 
@@ -257,11 +269,11 @@ export class RunStatsRepository {
             `stat_hour >= ${this.adapter.getPlaceholder(paramIndex++)}`,
             `stat_hour < ${this.adapter.getPlaceholder(paramIndex++)}`,
         ];
-        const params: any[] = [startTime, endTime];
+        const params: (string | number)[] = [startTime, endTime];
 
         if (filters.model_name) {
             where.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             params.push(filters.model_name);
         }
