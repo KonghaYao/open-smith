@@ -12,6 +12,26 @@ export const DateRangePicker = (props: DateRangePickerProps): JSXElement => {
     const [isOpen, setIsOpen] = createSignal(false);
     let containerRef: HTMLDivElement | undefined;
 
+    // 将 ISO 时间字符串转换为 datetime-local 输入框需要的格式
+    const formatForInput = (isoDate: string) => {
+        if (!isoDate) return "";
+        const date = new Date(isoDate);
+        // 转换为 YYYY-MM-DDTHH:mm 格式
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+
+    // 将 datetime-local 输入框的值转换为 ISO 字符串
+    const formatToISO = (localDateTime: string) => {
+        if (!localDateTime) return "";
+        const date = new Date(localDateTime);
+        return date.toISOString();
+    };
+
     const handleClickOutside = (event: MouseEvent) => {
         if (containerRef && !containerRef.contains(event.target as Node)) {
             setIsOpen(false);
@@ -77,10 +97,10 @@ export const DateRangePicker = (props: DateRangePickerProps): JSXElement => {
                             <input
                                 type="datetime-local"
                                 class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                value={props.startTime}
+                                value={formatForInput(props.startTime)}
                                 onInput={(e) =>
                                     props.onStartTimeChange(
-                                        e.currentTarget.value
+                                        formatToISO(e.currentTarget.value)
                                     )
                                 }
                             />
@@ -92,9 +112,9 @@ export const DateRangePicker = (props: DateRangePickerProps): JSXElement => {
                             <input
                                 type="datetime-local"
                                 class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                value={props.endTime}
+                                value={formatForInput(props.endTime)}
                                 onInput={(e) =>
-                                    props.onEndTimeChange(e.currentTarget.value)
+                                    props.onEndTimeChange(formatToISO(e.currentTarget.value))
                                 }
                             />
                         </div>

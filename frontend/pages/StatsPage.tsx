@@ -87,7 +87,8 @@ const MultiSelect = (props: {
             <button
                 type="button"
                 class="px-2 py-1 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 w-48 text-left bg-white flex justify-between items-center text-xs"
-                onClick={() => setIsOpen(!isOpen())}>
+                onClick={() => setIsOpen(!isOpen())}
+            >
                 <span class="truncate">
                     {selectedLabels().length > 0
                         ? selectedLabels().length > 2
@@ -99,7 +100,8 @@ const MultiSelect = (props: {
                     class="w-3 h-3"
                     fill="none"
                     stroke="currentColor"
-                    viewBox="0 0 24 24">
+                    viewBox="0 0 24 24"
+                >
                     <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
@@ -119,7 +121,8 @@ const MultiSelect = (props: {
                                         ? "bg-blue-50"
                                         : ""
                                 }`}
-                                onClick={() => handleOptionClick(option.value)}>
+                                onClick={() => handleOptionClick(option.value)}
+                            >
                                 <input
                                     type="checkbox"
                                     checked={props.value.includes(option.value)}
@@ -238,7 +241,7 @@ const StatsPage = (): JSX.Element => {
     ];
 
     const modelColorsWithAlpha = modelColors.map((color) =>
-        color.replace("rgb", "rgba").replace(")", ", 0.5)")
+        color.replace("rgb", "rgba").replace(")", ", 0.5)"),
     );
 
     const handleMetricChange = (event: Event) => {
@@ -455,7 +458,7 @@ const StatsPage = (): JSX.Element => {
 
     const handleFilterChange = <K extends keyof Filters>(
         type: K,
-        value: Filters[K]
+        value: Filters[K],
     ) => {
         setFilters((prev) => ({ ...prev, [type]: value as any }));
     };
@@ -507,7 +510,8 @@ const StatsPage = (): JSX.Element => {
                 return (
                     <A
                         href={`/llm-records?start_time_after=${startTime.toISOString()}&start_time_before=${endTime.toISOString()}`}
-                        class="text-blue-600 hover:underline">
+                        class="text-blue-600 hover:underline"
+                    >
                         {new Date(row.stat_hour).toLocaleString()}
                     </A>
                 );
@@ -595,7 +599,9 @@ const StatsPage = (): JSX.Element => {
             {/* Fixed Header */}
             <div class="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
                 <div class="p-4">
-                    <h1 class="text-2xl font-bold text-gray-800 mb-3">LLM 运行统计面板</h1>
+                    <h1 class="text-2xl font-bold text-gray-800 mb-3">
+                        LLM 运行统计面板
+                    </h1>
 
                     {/* Compact Filter Section */}
                     <div class="p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
@@ -605,13 +611,17 @@ const StatsPage = (): JSX.Element => {
                                     {(range) => (
                                         <button
                                             class={`px-2 py-1 rounded border text-xs ${
-                                                selectedTimeRange() === range.value
+                                                selectedTimeRange() ===
+                                                range.value
                                                     ? "bg-blue-500 text-white border-blue-500"
                                                     : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
                                             }`}
                                             onClick={() =>
-                                                handleTimeRangeChange(range.value)
-                                            }>
+                                                handleTimeRangeChange(
+                                                    range.value,
+                                                )
+                                            }
+                                        >
                                             {range.label}
                                         </button>
                                     )}
@@ -621,19 +631,29 @@ const StatsPage = (): JSX.Element => {
                             {/* Compact Selects */}
                             <select
                                 class="px-2 py-1 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 w-32 text-xs"
-                                onchange={(e) => handleSelectChange("modelName", e)}>
+                                onchange={(e) =>
+                                    handleSelectChange("modelName", e)
+                                }
+                            >
                                 <option value="">所有模型</option>
                                 <For each={availableFilters()?.modelNames}>
-                                    {(name) => <option value={name}>{name}</option>}
+                                    {(name) => (
+                                        <option value={name}>{name}</option>
+                                    )}
                                 </For>
                             </select>
 
                             <select
                                 class="px-2 py-1 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 w-32 text-xs"
-                                onchange={(e) => handleSelectChange("system", e)}>
+                                onchange={(e) =>
+                                    handleSelectChange("system", e)
+                                }
+                            >
                                 <option value="">所有系统</option>
                                 <For each={availableFilters()?.systems}>
-                                    {(sys) => <option value={sys}>{sys}</option>}
+                                    {(sys) => (
+                                        <option value={sys}>{sys}</option>
+                                    )}
                                 </For>
                             </select>
                         </div>
@@ -687,7 +707,8 @@ const StatsPage = (): JSX.Element => {
                             </h2>
                             <select
                                 class="px-2 py-1 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 w-40 text-xs"
-                                onchange={(e) => handleMetricChange(e)}>
+                                onchange={(e) => handleMetricChange(e)}
+                            >
                                 <option value="total_runs">总运行次数</option>
                                 <option value="error_rate">错误率</option>
                                 <option value="avg_duration_ms">
@@ -699,15 +720,21 @@ const StatsPage = (): JSX.Element => {
                                 <option value="p99_duration_ms">
                                     P99 持续时间
                                 </option>
-                                <option value="avg_ttft_ms">平均首包时间</option>
-                                <option value="p95_ttft_ms">P95 首包时间</option>
+                                <option value="avg_ttft_ms">
+                                    平均首包时间
+                                </option>
+                                <option value="p95_ttft_ms">
+                                    P95 首包时间
+                                </option>
                                 <option value="total_tokens_sum">
                                     总 Token 数
                                 </option>
                                 <option value="avg_tokens_per_run">
                                     平均 Token 数
                                 </option>
-                                <option value="distinct_users">独立用户数</option>
+                                <option value="distinct_users">
+                                    独立用户数
+                                </option>
                             </select>
                         </div>
                         {statsData.loading ? (
@@ -730,18 +757,13 @@ const StatsPage = (): JSX.Element => {
                     </div>
                 </div>
 
-                <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
-                    <h2 class="text-lg font-semibold text-gray-700 mb-3">
-                        运行数据明细
-                    </h2>
-                    <Table
-                        columnsConfig={statsColumns}
-                        data={statsData() || []}
-                        loading={statsData.loading}
-                        error={statsData.error}
-                        onRowClick={() => {}}
-                    />
-                </div>
+                <Table
+                    columnsConfig={statsColumns}
+                    data={statsData() || []}
+                    loading={statsData.loading}
+                    error={statsData.error}
+                    onRowClick={() => {}}
+                />
             </div>
         </div>
     );

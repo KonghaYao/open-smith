@@ -16,9 +16,6 @@ export function Table<T>(props: {
 }) {
     return (
         <div class="bg-white shadow rounded-lg p-4 flex-1 overflow-auto flex flex-col">
-            <h2 class="text-lg font-semibold text-gray-800 mb-4">
-                Runs Details
-            </h2>
             {props.loading ? (
                 <p>Loading runs data...</p>
             ) : props.error ? (

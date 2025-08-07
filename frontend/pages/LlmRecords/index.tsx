@@ -1,12 +1,5 @@
 import { type JSXElement } from "solid-js";
-import {
-    createSignal,
-    createResource,
-    For,
-    Show,
-    createMemo,
-    onMount,
-} from "solid-js";
+import { createSignal, createResource, For, Show, createMemo } from "solid-js";
 import { RunDetailsPanel } from "./RunDetailsPanel.jsx";
 import { DateRangePicker } from "./DateRangePicker.js";
 import { ofetch } from "../../api.js";
@@ -28,7 +21,21 @@ import {
 } from "lucide-solid";
 import type { RunRecord } from "../../../src/types.js";
 import copy from "copy-to-clipboard";
-import { A, Navigate, useSearchParams } from "@solidjs/router";
+import { A, useSearchParams } from "@solidjs/router";
+
+// 时间计算函数
+const threeDaysAgo = (): Date => {
+    const d = new Date();
+    d.setDate(d.getDate() - 3);
+    return d;
+};
+
+const todayEnd = (): Date => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d;
+};
+
 // 定义类型接口
 interface LlmRunFilters {
     run_type?: string;
@@ -69,7 +76,8 @@ const columnsConfig: ColumnConfig[] = [
                         <button
                             onClick={() => copy(run.thread_id!)}
                             class="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                            title="复制 会话 ID">
+                            title="复制 会话 ID"
+                        >
                             <Copy class="inline-block w-3 h-3 mr-1" />
                             复制
                         </button>
@@ -81,7 +89,8 @@ const columnsConfig: ColumnConfig[] = [
                         <A
                             href={`/?thread_id=${run.thread_id}`}
                             class="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                            title="查看会话">
+                            title="查看会话"
+                        >
                             <ArrowRight class="inline-block w-3 h-3 mr-1" />
                             查看
                         </A>
@@ -95,7 +104,8 @@ const columnsConfig: ColumnConfig[] = [
                         <button
                             onClick={() => copy(run.trace_id!)}
                             class="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                            title="复制 多轮对话 ID">
+                            title="复制 多轮对话 ID"
+                        >
                             <Copy class="inline-block w-3 h-3 mr-1" />
                             复制
                         </button>
@@ -103,11 +113,12 @@ const columnsConfig: ColumnConfig[] = [
                 </div>
                 <div class="text-sm font-mono text-gray-700 break-all">
                     {run.trace_id || "-"}
-                    {run.trace_id && (
+                    {run.trace_id && run.thread_id && (
                         <A
                             href={`/?thread_id=${run.thread_id}&trace_id=${run.trace_id}`}
                             class="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                            title="查看会话">
+                            title="查看会话"
+                        >
                             <ArrowRight class="inline-block w-3 h-3 mr-1" />
                             查看
                         </A>
@@ -115,7 +126,7 @@ const columnsConfig: ColumnConfig[] = [
                 </div>
             </div>
         ),
-        className: "px-4 py-3 border-b border-gray-100",
+        className: "px-3 py-2 border-b border-gray-100",
     },
     {
         header: "运行详情",
@@ -133,13 +144,14 @@ const columnsConfig: ColumnConfig[] = [
                 </div>
                 <div
                     class={`text-sm text-gray-600 border rounded text-center w-fit px-2 ${getColorFromString(
-                        run.system || ""
-                    )}`}>
+                        run.system || "",
+                    )}`}
+                >
                     {run.system || "-"}
                 </div>
             </div>
         ),
-        className: "px-4 py-3 border-b border-gray-100",
+        className: "px-3 py-2 border-b border-gray-100",
     },
     {
         header: "模型名称",
@@ -147,8 +159,9 @@ const columnsConfig: ColumnConfig[] = [
         format: (run) => (
             <span
                 class={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getColorFromString(
-                    run.model_name || ""
-                )}`}>
+                    run.model_name || "",
+                )}`}
+            >
                 {run.model_name || "-"}
             </span>
         ),
@@ -161,7 +174,7 @@ const columnsConfig: ColumnConfig[] = [
             let message = "";
             try {
                 const content = JSON.parse(
-                    run.outputs || "{}"
+                    run.outputs || "{}",
                 ).generations?.[0]?.map((i: any) => i.message)[0].kwargs
                     .content;
                 if (typeof content === "string") {
@@ -179,12 +192,13 @@ const columnsConfig: ColumnConfig[] = [
             return (
                 <span
                     class="block items-center px-2.5 py-0.5 rounded-full text-xs font-medium overflow-hidden text-ellipsis max-w-40 max-w-[10rem] whitespace-normal leading-[1.4em] h-[2.8em]"
-                    title={message}>
+                    title={message}
+                >
                     {message}
                 </span>
             );
         },
-        className: "px-4 py-3 border-b border-gray-100",
+        className: "px-3 py-2 border-b border-gray-100",
     },
     {
         header: "首字时间",
@@ -194,7 +208,7 @@ const columnsConfig: ColumnConfig[] = [
                 {formatTimeToFirstToken(run.time_to_first_token!)}
             </span>
         ),
-        className: "px-4 py-3 border-b border-gray-100 text-center",
+        className: "px-3 py-2 border-b border-gray-100 text-center",
     },
     {
         header: "生成时长",
@@ -203,11 +217,11 @@ const columnsConfig: ColumnConfig[] = [
             <span class="text-sm font-mono text-gray-700">
                 {formatDuration(
                     run.start_time.toString(),
-                    run.end_time?.toString()
+                    run.end_time?.toString(),
                 )}
             </span>
         ),
-        className: "px-4 py-3 border-b border-gray-100 text-center",
+        className: "px-3 py-2 border-b border-gray-100 text-center",
     },
     {
         header: "总 Token",
@@ -217,7 +231,7 @@ const columnsConfig: ColumnConfig[] = [
                 {(run.total_tokens || 0).toLocaleString()}
             </span>
         ),
-        className: "px-4 py-3 border-b border-gray-100 text-center",
+        className: "px-3 py-2 border-b border-gray-100 text-center",
     },
     {
         header: "用户 ID",
@@ -225,8 +239,9 @@ const columnsConfig: ColumnConfig[] = [
         format: (run) => (
             <span
                 class={`inline-flex items-center px-2 py-1 rounded text-xs font-medium border ${getColorFromString(
-                    run.user_id || ""
-                )}`}>
+                    run.user_id || "",
+                )}`}
+            >
                 {run.user_id || "-"}
             </span>
         ),
@@ -240,7 +255,7 @@ const columnsConfig: ColumnConfig[] = [
                 {formatUnixTimestamp(run.start_time.toString())}
             </span>
         ),
-        className: "px-4 py-3 border-b border-gray-100",
+        className: "px-3 py-2 border-b border-gray-100",
     },
 ];
 
@@ -269,7 +284,7 @@ const fetchModelNames = async () => {
 const fetchLlmRuns = async ([currentPage, itemsPerPage, filters]: [
     number,
     number,
-    LlmRunFilters
+    LlmRunFilters,
 ]) => {
     const offset = (currentPage - 1) * itemsPerPage;
 
@@ -294,7 +309,7 @@ const fetchLlmRuns = async ([currentPage, itemsPerPage, filters]: [
     try {
         // 使用新的搜索接口
         const response = await ofetch<RunDataResponse>(
-            `/trace/search/runs?${queryParams.toString()}`
+            `/trace/search/runs?${queryParams.toString()}`,
         );
         if (response.success && Array.isArray(response.data)) {
             return {
@@ -328,8 +343,12 @@ export const LlmRecords = () => {
         model_name: (searchParams.model_name as string) || "",
         thread_id: (searchParams.thread_id as string) || "",
         user_id: (searchParams.user_id as string) || "",
-        start_time_after: (searchParams.start_time_after as string) || "",
-        start_time_before: (searchParams.start_time_before as string) || "",
+        start_time_after:
+            (searchParams.start_time_after as string) ||
+            threeDaysAgo().toISOString(),
+        start_time_before:
+            (searchParams.start_time_before as string) ||
+            todayEnd().toISOString(),
     });
 
     // 临时过滤条件（用于输入）
@@ -339,8 +358,12 @@ export const LlmRecords = () => {
         model_name: (searchParams.model_name as string) || "",
         thread_id: (searchParams.thread_id as string) || "",
         user_id: (searchParams.user_id as string) || "",
-        start_time_after: (searchParams.start_time_after as string) || "",
-        start_time_before: (searchParams.start_time_before as string) || "",
+        start_time_after:
+            (searchParams.start_time_after as string) ||
+            threeDaysAgo().toISOString(),
+        start_time_before:
+            (searchParams.start_time_before as string) ||
+            todayEnd().toISOString(),
     });
 
     // 资源加载
@@ -355,7 +378,7 @@ export const LlmRecords = () => {
                 filters(),
             ];
             return await fetchLlmRuns([currentP, itemsP, filtersA]);
-        }
+        },
     );
 
     const totalRunsCount = createMemo(() => {
@@ -386,7 +409,7 @@ export const LlmRecords = () => {
     // 处理临时过滤条件变化
     const handleTempFilterChange = (
         field: keyof LlmRunFilters,
-        value: string
+        value: string,
     ) => {
         setTempFilters((prev) => ({ ...prev, [field]: value }));
     };
@@ -405,9 +428,9 @@ export const LlmRecords = () => {
             system: "",
             model_name: "",
             thread_id: "",
-            user_id: "", // 清除 user_id 过滤条件
-            start_time_after: "", // 清除时间过滤
-            start_time_before: "", // 清除时间过滤
+            user_id: "",
+            start_time_after: threeDaysAgo().toISOString(), // 默认最近三天
+            start_time_before: todayEnd().toISOString(), // 默认今天结束
         };
         setTempFilters(defaultFilters);
         setFilters(defaultFilters);
@@ -415,74 +438,68 @@ export const LlmRecords = () => {
     };
 
     return (
-        <div class="min-h-screen bg-gray-50">
-            {/* 顶部导航栏 */}
-            <header class="bg-white border-b border-gray-200">
-                <div class="px-6 py-4">
+        <div class="h-screen bg-gray-50 flex flex-col">
+            {/* 固定顶部导航栏 */}
+            <header class="bg-white border-b border-gray-200 flex-shrink-0 sticky top-0 z-10">
+                <div class="px-4 py-3">
                     <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-4">
-                            <h1 class="text-2xl font-bold text-gray-900">
+                        <div class="flex items-center space-x-3">
+                            <h1 class="text-xl font-bold text-gray-900">
                                 追踪概览
                             </h1>
-                            <div class="h-6 w-px bg-gray-300"></div>
+                            <div class="h-5 w-px bg-gray-300"></div>
                             <span class="text-sm text-gray-500">
                                 运行数据监控面板
                             </span>
                         </div>
                         <button
                             onClick={refetchLlmRuns}
-                            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                            <RefreshCw class="w-4 h-4 mr-2" />
+                            class="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                        >
+                            <RefreshCw class="w-4 h-4 mr-1.5" />
                             刷新数据
                         </button>
                     </div>
-                </div>
-            </header>
-
-            {/* 主要内容区域 */}
-            <main class="flex-1 px-6 py-6">
-                {/* 过滤条件卡片 */}
-                <div class="bg-white rounded-lg border border-gray-200 mb-4">
-                    <div class="px-4 py-3 border-b border-gray-200">
-                        <h3 class="text-md font-medium text-gray-900">
-                            过滤条件
-                        </h3>
-                    </div>
-                    <div class="p-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                </div>{" "}
+                {/* 固定过滤条件卡片 */}
+                <div class="bg-white border-b border-gray-200 flex-shrink-0">
+                    <div class="p-3">
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                            {/* <div>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">
                                     运行类型
                                 </label>
                                 <select
-                                    class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                    class="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-white shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                                     value={tempFilters().run_type}
                                     onChange={(e) =>
                                         handleTempFilterChange(
                                             "run_type",
-                                            e.currentTarget.value
+                                            e.currentTarget.value,
                                         )
-                                    }>
+                                    }
+                                >
                                     <option value="">全部类型</option>
                                     <option value="llm">LLM 运行</option>
                                     <option value="chain">链式运行</option>
                                     <option value="tool">工具运行</option>
                                     <option value="retriever">检索运行</option>
                                 </select>
-                            </div>
+                            </div> */}
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">
                                     系统
                                 </label>
                                 <select
-                                    class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                    class="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-white shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                                     value={tempFilters().system}
                                     onChange={(e) =>
                                         handleTempFilterChange(
                                             "system",
-                                            e.currentTarget.value
+                                            e.currentTarget.value,
                                         )
-                                    }>
+                                    }
+                                >
                                     <option value="">全部系统</option>
                                     <For each={systemsResource()}>
                                         {(system: string) => (
@@ -494,18 +511,19 @@ export const LlmRecords = () => {
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">
                                     模型
                                 </label>
                                 <select
-                                    class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                    class="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-white shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                                     value={tempFilters().model_name}
                                     onChange={(e) =>
                                         handleTempFilterChange(
                                             "model_name",
-                                            e.currentTarget.value
+                                            e.currentTarget.value,
                                         )
-                                    }>
+                                    }
+                                >
                                     <option value="">全部模型</option>
                                     <For each={modelNamesResource()}>
                                         {(modelName: string) => (
@@ -517,42 +535,42 @@ export const LlmRecords = () => {
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">
                                     会话 ID
                                 </label>
                                 <input
                                     type="text"
-                                    class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                    placeholder="请输入会话 ID..."
+                                    class="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-white shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                    placeholder="会话 ID..."
                                     value={tempFilters().thread_id}
                                     onInput={(e) =>
                                         handleTempFilterChange(
                                             "thread_id",
-                                            e.currentTarget.value
+                                            e.currentTarget.value,
                                         )
                                     }
                                 />
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">
                                     用户ID
                                 </label>
                                 <input
                                     type="text"
-                                    class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                    placeholder="请输入用户ID..."
+                                    class="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-white shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                    placeholder="用户ID..."
                                     value={tempFilters().user_id}
                                     onInput={(e) =>
                                         handleTempFilterChange(
                                             "user_id",
-                                            e.currentTarget.value
+                                            e.currentTarget.value,
                                         )
                                     }
                                 />
                             </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">
-                                    起始时间 (起)
+                            <div style=" grid-column: span 2 / span 2;">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">
+                                    时间范围
                                 </label>
                                 <DateRangePicker
                                     startTime={tempFilters().start_time_after!}
@@ -560,35 +578,37 @@ export const LlmRecords = () => {
                                     onStartTimeChange={(value) =>
                                         handleTempFilterChange(
                                             "start_time_after",
-                                            value
+                                            value,
                                         )
                                     }
                                     onEndTimeChange={(value) =>
                                         handleTempFilterChange(
                                             "start_time_before",
-                                            value
+                                            value,
                                         )
                                     }
                                 />
                             </div>
                         </div>
-                        <div class="mt-4 flex items-center justify-between">
+                        <div class="mt-3 flex items-center justify-between">
                             <div class="flex items-center space-x-2">
                                 <button
                                     onClick={handleSearch}
-                                    class="inline-flex items-center px-3 py-1.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                                    <Search class="w-4 h-4 mr-2" />
+                                    class="inline-flex items-center px-2.5 py-1 border border-transparent rounded shadow-sm text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-blue-500 transition-colors"
+                                >
+                                    <Search class="w-3 h-3 mr-1" />
                                     搜索
                                 </button>
                                 <button
                                     onClick={handleClearFilters}
-                                    class="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                                    <Eraser class="w-4 h-4 mr-2" />
+                                    class="inline-flex items-center px-2.5 py-1 border border-gray-300 rounded shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-blue-500 transition-colors"
+                                >
+                                    <Eraser class="w-3 h-3 mr-1" />
                                     清除
                                 </button>
                             </div>
                             <div class="text-xs text-gray-500">
-                                当前筛选结果：
+                                结果：
                                 <span class="font-medium">
                                     {totalRunsCount()}
                                 </span>
@@ -597,185 +617,173 @@ export const LlmRecords = () => {
                         </div>
                     </div>
                 </div>
+            </header>
 
-                {/* 数据表格和详情面板 */}
-                <div class="flex gap-6 h-auto">
-                    {/* 数据表格 */}
-                    <div class="flex-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
-                        <div class="px-6 py-4 border-b border-gray-200">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <h3 class="text-lg font-medium text-gray-900">
-                                        运行记录
-                                    </h3>
-                                    <p class="mt-1 text-sm text-gray-500">
-                                        点击行查看详细信息
-                                    </p>
-                                </div>
-                                <div class="flex items-center text-sm text-gray-500">
-                                    <span>共 {totalRunsCount()} 条记录</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="overflow-auto" style="max-height: 600px;">
-                            <Show
-                                when={
-                                    llmRunsResource.loading ||
-                                    llmRunsResource.error ||
-                                    !llmRunsResource()?.runs
-                                }>
-                                <div class="p-8 text-center">
-                                    <Show
-                                        when={llmRunsResource.loading}
-                                        fallback={
-                                            <Show
-                                                when={llmRunsResource.error}
-                                                fallback={
-                                                    <div class="text-center">
-                                                        <Info class="mx-auto h-12 w-12 text-gray-400" />
-                                                        <h3 class="mt-2 text-sm font-medium text-gray-900">
-                                                            暂无数据
-                                                        </h3>
-                                                        <p class="mt-1 text-sm text-gray-500">
-                                                            当前筛选条件下没有找到运行记录
-                                                        </p>
-                                                    </div>
-                                                }>
+            {/* 主要内容区域 - 可滚动 */}
+            <main class="flex-1 flex gap-4 p-4 overflow-hidden">
+                {/* 数据表格 */}
+                <div class="flex-1 bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col">
+                    {/* 可滚动的表格内容 */}
+                    <div class="flex-1 overflow-auto">
+                        <Show
+                            when={
+                                llmRunsResource.loading ||
+                                llmRunsResource.error ||
+                                !llmRunsResource()?.runs
+                            }
+                        >
+                            <div class="p-8 text-center">
+                                <Show
+                                    when={llmRunsResource.loading}
+                                    fallback={
+                                        <Show
+                                            when={llmRunsResource.error}
+                                            fallback={
                                                 <div class="text-center">
-                                                    <X class="mx-auto h-12 w-12 text-red-400" />
+                                                    <Info class="mx-auto h-10 w-10 text-gray-400" />
                                                     <h3 class="mt-2 text-sm font-medium text-gray-900">
-                                                        加载错误
+                                                        暂无数据
                                                     </h3>
-                                                    <p class="mt-1 text-sm text-gray-500">
-                                                        {
-                                                            llmRunsResource
-                                                                .error?.message
-                                                        }
+                                                    <p class="mt-1 text-xs text-gray-500">
+                                                        当前筛选条件下没有找到运行记录
                                                     </p>
                                                 </div>
-                                            </Show>
-                                        }>
-                                        <div class="inline-flex items-center">
-                                            <LoaderCircle class="w-4 h-4 mr-2 animate-spin" />
-                                            <span class="text-gray-600">
-                                                正在加载数据...
-                                            </span>
-                                        </div>
-                                    </Show>
-                                </div>
-                            </Show>
-                            <Show
-                                when={
-                                    !llmRunsResource.loading &&
-                                    !llmRunsResource.error &&
-                                    llmRunsResource()?.runs
-                                }>
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <For each={columnsConfig}>
-                                                {(col: ColumnConfig) => (
-                                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                                                        {col.header}
-                                                    </th>
-                                                )}
-                                            </For>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <For each={llmRunsResource()?.runs}>
-                                            {(run) => (
-                                                <tr
-                                                    class="hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-100"
-                                                    onClick={() =>
-                                                        handleRowClick(run)
-                                                    }>
-                                                    <For each={columnsConfig}>
-                                                        {(
-                                                            col: ColumnConfig
-                                                        ) => (
-                                                            <td
-                                                                class={
-                                                                    col.className
-                                                                }>
-                                                                {col.format(
-                                                                    run
-                                                                )}
-                                                            </td>
-                                                        )}
-                                                    </For>
-                                                </tr>
-                                            )}
-                                        </For>
-                                    </tbody>
-                                </table>
-                            </Show>
-                        </div>
-
-                        {/* 分页控件 */}
-                        <Show
-                            when={!llmRunsResource.loading && totalPages() > 0}>
-                            <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                                <div class="flex items-center justify-between">
-                                    <button
-                                        onClick={handlePrevPage}
-                                        disabled={
-                                            currentPage() === 1 ||
-                                            llmRunsResource.loading
-                                        }
-                                        class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                        <ArrowLeft class="w-4 h-4 mr-2" />
-                                        上一页
-                                    </button>
-
-                                    <div class="flex items-center space-x-2">
-                                        <span class="text-sm text-gray-700">
-                                            第
-                                            <span class="font-medium">
-                                                {currentPage()}
-                                            </span>
-                                            页，共
-                                            <span class="font-medium">
-                                                {totalPages()}
-                                            </span>
-                                            页
-                                        </span>
-                                        <div class="h-4 w-px bg-gray-300"></div>
-                                        <span class="text-sm text-gray-500">
-                                            总计
-                                            <span class="font-medium">
-                                                {totalRunsCount()}
-                                            </span>
-                                            条记录
+                                            }
+                                        >
+                                            <div class="text-center">
+                                                <X class="mx-auto h-10 w-10 text-red-400" />
+                                                <h3 class="mt-2 text-sm font-medium text-gray-900">
+                                                    加载错误
+                                                </h3>
+                                                <p class="mt-1 text-xs text-gray-500">
+                                                    {
+                                                        llmRunsResource.error
+                                                            ?.message
+                                                    }
+                                                </p>
+                                            </div>
+                                        </Show>
+                                    }
+                                >
+                                    <div class="inline-flex items-center">
+                                        <LoaderCircle class="w-4 h-4 mr-2 animate-spin" />
+                                        <span class="text-gray-600 text-sm">
+                                            正在加载数据...
                                         </span>
                                     </div>
-
-                                    <button
-                                        onClick={handleNextPage}
-                                        disabled={
-                                            currentPage() === totalPages() ||
-                                            llmRunsResource.loading
-                                        }
-                                        class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                                        下一页
-                                        <ArrowRight class="w-4 h-4 ml-2" />
-                                    </button>
-                                </div>
+                                </Show>
                             </div>
+                        </Show>
+                        <Show
+                            when={
+                                !llmRunsResource.loading &&
+                                !llmRunsResource.error &&
+                                llmRunsResource()?.runs
+                            }
+                        >
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50 sticky top-0">
+                                    <tr>
+                                        <For each={columnsConfig}>
+                                            {(col: ColumnConfig) => (
+                                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200 bg-gray-50">
+                                                    {col.header}
+                                                </th>
+                                            )}
+                                        </For>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <For each={llmRunsResource()?.runs}>
+                                        {(run) => (
+                                            <tr
+                                                class="hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-100"
+                                                onClick={() =>
+                                                    handleRowClick(run)
+                                                }
+                                            >
+                                                <For each={columnsConfig}>
+                                                    {(col: ColumnConfig) => (
+                                                        <td
+                                                            class={
+                                                                col.className
+                                                            }
+                                                        >
+                                                            {col.format(run)}
+                                                        </td>
+                                                    )}
+                                                </For>
+                                            </tr>
+                                        )}
+                                    </For>
+                                </tbody>
+                            </table>
                         </Show>
                     </div>
 
-                    {/* 右侧详情面板 */}
-                    <Show when={selectedRun()}>
-                        {
-                            <RunDetailsPanel
-                                run={selectedRun()!}
-                                onClose={() => setSelectedRun(null)}
-                            />
-                        }
+                    {/* 固定分页控件 */}
+                    <Show when={totalPages() > 0}>
+                        <div class="px-4 py-3 border-t border-gray-200 bg-gray-50 flex-shrink-0 sticky bottom-0 z-10">
+                            <div class="flex items-center justify-between">
+                                <button
+                                    onClick={handlePrevPage}
+                                    disabled={
+                                        currentPage() === 1 ||
+                                        llmRunsResource.loading
+                                    }
+                                    class="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <ArrowLeft class="w-3 h-3 mr-1" />
+                                    上一页
+                                </button>
+
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs text-gray-700">
+                                        第
+                                        <span class="font-medium">
+                                            {currentPage()}
+                                        </span>
+                                        页，共
+                                        <span class="font-medium">
+                                            {totalPages()}
+                                        </span>
+                                        页
+                                    </span>
+                                    <div class="h-3 w-px bg-gray-300"></div>
+                                    <span class="text-xs text-gray-500">
+                                        总计
+                                        <span class="font-medium">
+                                            {totalRunsCount()}
+                                        </span>
+                                        条记录
+                                    </span>
+                                </div>
+
+                                <button
+                                    onClick={handleNextPage}
+                                    disabled={
+                                        currentPage() === totalPages() ||
+                                        llmRunsResource.loading
+                                    }
+                                    class="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    下一页
+                                    <ArrowRight class="w-3 h-3 ml-1" />
+                                </button>
+                            </div>
+                        </div>
                     </Show>
                 </div>
+
+                {/* 右侧详情面板 */}
+                <Show when={selectedRun()}>
+                    {
+                        <RunDetailsPanel
+                            run={selectedRun()!}
+                            onClose={() => setSelectedRun(null)}
+                        />
+                    }
+                </Show>
             </main>
         </div>
     );
