@@ -229,14 +229,16 @@ export class RunStatsRepository {
     }
 
     private async ensureStatsForHour(hour: string): Promise<void> {
+        // 检查该小时是否已经有任何统计数据
         const existingStmt = await this.adapter.prepare(`
-            SELECT 1 FROM run_stats_hourly WHERE stat_hour = ${this.adapter.getPlaceholder(
+            SELECT COUNT(*) as count FROM run_stats_hourly WHERE stat_hour = ${this.adapter.getPlaceholder(
                 1,
-            )} LIMIT 1
+            )}
         `);
-        const existing = await existingStmt.get([hour]);
+        const result = await existingStmt.get([hour]);
+        const existingCount = result?.count || 0;
 
-        if (!existing) {
+        if (existingCount === 0) {
             console.log(`Updating stats for hour: ${hour}`);
             await this.updateHourlyStats(hour);
         }
@@ -275,7 +277,10 @@ export class RunStatsRepository {
             `stat_hour >= ${this.adapter.getPlaceholder(paramIndex++)}`,
             `stat_hour < ${this.adapter.getPlaceholder(paramIndex++)}`,
         ];
-        const params: (string | number)[] = [startTime, effectiveEnd.toISOString()];
+        const params: (string | number)[] = [
+            startTime,
+            effectiveEnd.toISOString(),
+        ];
 
         if (filters.model_name) {
             where.push(

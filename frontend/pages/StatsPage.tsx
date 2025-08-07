@@ -14,9 +14,15 @@ import { Chart } from "../components/Chart.js";
 import type { ChartConfiguration } from "chart.js";
 import { A } from "@solidjs/router";
 
-const sevenDaysAgo = (): Date => {
+const threeDaysAgo = (): Date => {
     const d = new Date();
-    d.setDate(d.getDate() - 7);
+    d.setDate(d.getDate() - 3);
+    return d;
+};
+
+const todayEnd = (): Date => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
     return d;
 };
 
@@ -48,6 +54,7 @@ const timeRanges = [
     { label: "最近3小时", value: "3h" },
     { label: "最近12小时", value: "12h" },
     { label: "最近1天", value: "1d" },
+    { label: "最近3天", value: "3d" },
     { label: "最近7天", value: "7d" },
     { label: "最近30天", value: "30d" },
 ];
@@ -79,7 +86,7 @@ const MultiSelect = (props: {
         <div class="relative">
             <button
                 type="button"
-                class="p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 w-64 text-left bg-white flex justify-between items-center"
+                class="px-2 py-1 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 w-48 text-left bg-white flex justify-between items-center text-xs"
                 onClick={() => setIsOpen(!isOpen())}>
                 <span class="truncate">
                     {selectedLabels().length > 0
@@ -89,7 +96,7 @@ const MultiSelect = (props: {
                         : props.placeholder}
                 </span>
                 <svg
-                    class="w-4 h-4"
+                    class="w-3 h-3"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24">
@@ -103,11 +110,11 @@ const MultiSelect = (props: {
             </button>
 
             {isOpen() && (
-                <div class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                <div class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-auto">
                     <For each={props.options}>
                         {(option) => (
                             <div
-                                class={`px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center ${
+                                class={`px-2 py-1 cursor-pointer hover:bg-gray-100 flex items-center text-xs ${
                                     props.value.includes(option.value)
                                         ? "bg-blue-50"
                                         : ""
@@ -116,10 +123,10 @@ const MultiSelect = (props: {
                                 <input
                                     type="checkbox"
                                     checked={props.value.includes(option.value)}
-                                    class="mr-2"
+                                    class="mr-2 w-3 h-3"
                                     readOnly
                                 />
-                                <span class="text-sm">{option.label}</span>
+                                <span>{option.label}</span>
                             </div>
                         )}
                     </For>
@@ -131,14 +138,14 @@ const MultiSelect = (props: {
 
 const StatsPage = (): JSX.Element => {
     const [filters, setFilters] = createSignal<Filters>({
-        startTime: sevenDaysAgo(),
-        endTime: new Date(),
+        startTime: threeDaysAgo(),
+        endTime: todayEnd(),
         modelName: null,
         system: null,
     });
 
     const [selectedTimeRange, setSelectedTimeRange] =
-        createSignal<string>("7d");
+        createSignal<string>("3d");
 
     const [availableFilters] = createResource(async () => {
         try {
@@ -470,6 +477,9 @@ const StatsPage = (): JSX.Element => {
             case "1d":
                 startTime.setDate(startTime.getDate() - 1);
                 break;
+            case "3d":
+                startTime.setDate(startTime.getDate() - 3);
+                break;
             case "7d":
                 startTime.setDate(startTime.getDate() - 7);
                 break;
@@ -581,148 +591,157 @@ const StatsPage = (): JSX.Element => {
     ];
 
     return (
-        <div class="p-6 space-y-4 bg-gray-50 min-h-screen">
-            <h1 class="text-3xl font-bold text-gray-800">LLM 运行统计面板</h1>
+        <div class="bg-gray-50 min-h-screen">
+            {/* Fixed Header */}
+            <div class="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
+                <div class="p-4">
+                    <h1 class="text-2xl font-bold text-gray-800 mb-3">LLM 运行统计面板</h1>
 
-            <div class="p-5 bg-white border border-gray-200 rounded-lg shadow-sm">
-                <div class="flex flex-wrap gap-4 items-center">
-                    <div class="flex items-center gap-2">
-                        <For each={timeRanges}>
-                            {(range) => (
-                                <button
-                                    class={`p-2 rounded-md border text-sm ${
-                                        selectedTimeRange() === range.value
-                                            ? "bg-blue-500 text-white border-blue-500"
-                                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
-                                    }`}
-                                    onClick={() =>
-                                        handleTimeRangeChange(range.value)
-                                    }>
-                                    {range.label}
-                                </button>
-                            )}
-                        </For>
+                    {/* Compact Filter Section */}
+                    <div class="p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
+                        <div class="flex flex-wrap gap-2 items-center">
+                            <div class="flex items-center gap-1">
+                                <For each={timeRanges}>
+                                    {(range) => (
+                                        <button
+                                            class={`px-2 py-1 rounded border text-xs ${
+                                                selectedTimeRange() === range.value
+                                                    ? "bg-blue-500 text-white border-blue-500"
+                                                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                                            }`}
+                                            onClick={() =>
+                                                handleTimeRangeChange(range.value)
+                                            }>
+                                            {range.label}
+                                        </button>
+                                    )}
+                                </For>
+                            </div>
+
+                            {/* Compact Selects */}
+                            <select
+                                class="px-2 py-1 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 w-32 text-xs"
+                                onchange={(e) => handleSelectChange("modelName", e)}>
+                                <option value="">所有模型</option>
+                                <For each={availableFilters()?.modelNames}>
+                                    {(name) => <option value={name}>{name}</option>}
+                                </For>
+                            </select>
+
+                            <select
+                                class="px-2 py-1 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 w-32 text-xs"
+                                onchange={(e) => handleSelectChange("system", e)}>
+                                <option value="">所有系统</option>
+                                <For each={availableFilters()?.systems}>
+                                    {(sys) => <option value={sys}>{sys}</option>}
+                                </For>
+                            </select>
+                        </div>
                     </div>
-
-                    {/* Selects */}
-                    <select
-                        class="p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 w-48"
-                        onchange={(e) => handleSelectChange("modelName", e)}>
-                        <option value="">所有模型</option>
-                        <For each={availableFilters()?.modelNames}>
-                            {(name) => <option value={name}>{name}</option>}
-                        </For>
-                    </select>
-
-                    <select
-                        class="p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 w-48"
-                        onchange={(e) => handleSelectChange("system", e)}>
-                        <option value="">所有系统</option>
-                        <For each={availableFilters()?.systems}>
-                            {(sys) => <option value={sys}>{sys}</option>}
-                        </For>
-                    </select>
                 </div>
             </div>
 
-            <div class="flex flex-wrap gap-4">
-                <div class="flex-1 p-5 bg-white border border-gray-200 rounded-lg shadow-sm h-96">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-semibold text-gray-700">
-                            多指标趋势分析
-                        </h2>
-                        <MultiSelect
-                            options={availableMetrics.map((m) => ({
-                                value: m.value,
-                                label: m.label,
-                            }))}
-                            value={selectedMetrics()}
-                            onChange={setSelectedMetrics}
-                            placeholder="选择统计指标"
-                        />
-                    </div>
-                    {statsData.loading ? (
-                        <div class="text-center p-8 text-gray-500">
-                            正在加载图表数据...
-                        </div>
-                    ) : statsData()?.length && selectedMetrics().length ? (
-                        <div class="h-full">
-                            <Chart
-                                type="line"
-                                data={chartData()}
-                                options={chartOptions()}
+            {/* Scrollable Content */}
+            <div class="p-4 space-y-4">
+                <div class="flex flex-wrap gap-4">
+                    <div class="flex-1 p-4 bg-white border border-gray-200 rounded-lg shadow-sm h-80">
+                        <div class="flex justify-between items-center mb-3">
+                            <h2 class="text-lg font-semibold text-gray-700">
+                                多指标趋势分析
+                            </h2>
+                            <MultiSelect
+                                options={availableMetrics.map((m) => ({
+                                    value: m.value,
+                                    label: m.label,
+                                }))}
+                                value={selectedMetrics()}
+                                onChange={setSelectedMetrics}
+                                placeholder="选择统计指标"
                             />
                         </div>
-                    ) : (
-                        <div class="text-center p-8 text-gray-500">
-                            {selectedMetrics().length === 0
-                                ? "请选择至少一个统计指标"
-                                : "没有符合所选筛选器的数据可用于图表。"}
-                        </div>
-                    )}
-                </div>
-
-                <div class="flex-1 p-5 bg-white border border-gray-200 rounded-lg shadow-sm h-96">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-semibold text-gray-700">
-                            模型性能趋势
-                        </h2>
-                        <select
-                            class="p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 w-48"
-                            onchange={(e) => handleMetricChange(e)}>
-                            <option value="total_runs">总运行次数</option>
-                            <option value="error_rate">错误率</option>
-                            <option value="avg_duration_ms">
-                                平均持续时间
-                            </option>
-                            <option value="p95_duration_ms">
-                                P95 持续时间
-                            </option>
-                            <option value="p99_duration_ms">
-                                P99 持续时间
-                            </option>
-                            <option value="avg_ttft_ms">平均首包时间</option>
-                            <option value="p95_ttft_ms">P95 首包时间</option>
-                            <option value="total_tokens_sum">
-                                总 Token 数
-                            </option>
-                            <option value="avg_tokens_per_run">
-                                平均 Token 数
-                            </option>
-                            <option value="distinct_users">独立用户数</option>
-                        </select>
+                        {statsData.loading ? (
+                            <div class="text-center p-8 text-gray-500">
+                                正在加载图表数据...
+                            </div>
+                        ) : statsData()?.length && selectedMetrics().length ? (
+                            <div class="h-full">
+                                <Chart
+                                    type="line"
+                                    data={chartData()}
+                                    options={chartOptions()}
+                                />
+                            </div>
+                        ) : (
+                            <div class="text-center p-8 text-gray-500">
+                                {selectedMetrics().length === 0
+                                    ? "请选择至少一个统计指标"
+                                    : "没有符合所选筛选器的数据可用于图表。"}
+                            </div>
+                        )}
                     </div>
-                    {statsData.loading ? (
-                        <div class="text-center p-8 text-gray-500">
-                            正在加载图表数据...
-                        </div>
-                    ) : newModelChartData()?.datasets.length ? (
-                        <Chart
-                            type="line"
-                            data={newModelChartData()}
-                            options={newModelChartOptions()}
-                        />
-                    ) : (
-                        <div class="text-center p-8 text-gray-500">
-                            {selectedMetric() === "total_runs"
-                                ? "请选择一个统计指标"
-                                : "没有符合所选筛选器的数据可用于按模型图表。"}
-                        </div>
-                    )}
-                </div>
-            </div>
 
-            <div class="p-5 bg-white border border-gray-200 rounded-lg shadow-sm">
-                <h2 class="text-xl font-semibold text-gray-700 mb-4">
-                    运行数据明细
-                </h2>
-                <Table
-                    columnsConfig={statsColumns}
-                    data={statsData() || []}
-                    loading={statsData.loading}
-                    error={statsData.error}
-                    onRowClick={() => {}}
-                />
+                    <div class="flex-1 p-4 bg-white border border-gray-200 rounded-lg shadow-sm h-80">
+                        <div class="flex justify-between items-center mb-3">
+                            <h2 class="text-lg font-semibold text-gray-700">
+                                模型性能趋势
+                            </h2>
+                            <select
+                                class="px-2 py-1 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 w-40 text-xs"
+                                onchange={(e) => handleMetricChange(e)}>
+                                <option value="total_runs">总运行次数</option>
+                                <option value="error_rate">错误率</option>
+                                <option value="avg_duration_ms">
+                                    平均持续时间
+                                </option>
+                                <option value="p95_duration_ms">
+                                    P95 持续时间
+                                </option>
+                                <option value="p99_duration_ms">
+                                    P99 持续时间
+                                </option>
+                                <option value="avg_ttft_ms">平均首包时间</option>
+                                <option value="p95_ttft_ms">P95 首包时间</option>
+                                <option value="total_tokens_sum">
+                                    总 Token 数
+                                </option>
+                                <option value="avg_tokens_per_run">
+                                    平均 Token 数
+                                </option>
+                                <option value="distinct_users">独立用户数</option>
+                            </select>
+                        </div>
+                        {statsData.loading ? (
+                            <div class="text-center p-8 text-gray-500">
+                                正在加载图表数据...
+                            </div>
+                        ) : newModelChartData()?.datasets.length ? (
+                            <Chart
+                                type="line"
+                                data={newModelChartData()}
+                                options={newModelChartOptions()}
+                            />
+                        ) : (
+                            <div class="text-center p-8 text-gray-500">
+                                {selectedMetric() === "total_runs"
+                                    ? "请选择一个统计指标"
+                                    : "没有符合所选筛选器的数据可用于按模型图表。"}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <h2 class="text-lg font-semibold text-gray-700 mb-3">
+                        运行数据明细
+                    </h2>
+                    <Table
+                        columnsConfig={statsColumns}
+                        data={statsData() || []}
+                        loading={statsData.loading}
+                        error={statsData.error}
+                        onRowClick={() => {}}
+                    />
+                </div>
             </div>
         </div>
     );
