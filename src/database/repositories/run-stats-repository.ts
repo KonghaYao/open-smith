@@ -252,13 +252,19 @@ export class RunStatsRepository {
     ): Promise<RunStatsHourlyRecord[]> {
         const start = new Date(startTime);
         const end = new Date(endTime);
+        const now = new Date();
 
         // 将 start time 对齐到小时的开始
         start.setUTCMinutes(0, 0, 0);
 
+        // 排除当前正在进行的小时，只统计已完成的小时
+        const effectiveEnd = new Date(Math.min(end.getTime(), now.getTime()));
+        // 将结束时间对齐到小时的开始，这样就不会包含当前正在进行的小时
+        effectiveEnd.setUTCMinutes(0, 0, 0);
+
         const current = new Date(start);
 
-        while (current < end) {
+        while (current < effectiveEnd) {
             const hourString = current.toISOString();
             await this.ensureStatsForHour(hourString);
             current.setUTCHours(current.getUTCHours() + 1);
@@ -269,7 +275,7 @@ export class RunStatsRepository {
             `stat_hour >= ${this.adapter.getPlaceholder(paramIndex++)}`,
             `stat_hour < ${this.adapter.getPlaceholder(paramIndex++)}`,
         ];
-        const params: (string | number)[] = [startTime, endTime];
+        const params: (string | number)[] = [startTime, effectiveEnd.toISOString()];
 
         if (filters.model_name) {
             where.push(
