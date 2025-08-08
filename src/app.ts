@@ -81,7 +81,10 @@ app.use(
     serveStatic({
         root: "./",
         getContent: async (path) => {
-            return fs.readFileSync(uiPath + path.replace("ui/", ""), "utf-8");
+            return fs.readFileSync(
+                uiPath + path.replace(/.*\/ui\//, ""),
+                "utf-8"
+            );
         },
     })
 );
