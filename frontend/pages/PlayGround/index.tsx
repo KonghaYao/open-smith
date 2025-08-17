@@ -1,9 +1,16 @@
-import { createSignal, For, Show, createMemo, createResource } from "solid-js";
+import {
+    createSignal,
+    For,
+    Show,
+    createMemo,
+    createResource,
+    Switch,
+    Match,
+} from "solid-js";
 import { Settings, Plus, X } from "lucide-solid";
 import { ModelConfigModal } from "../../components/ModelConfigModal.jsx";
 import { createStoreSignal } from "../../utils.jsx";
 import { GraphStateMessage } from "../../components/Graph/GraphState.jsx";
-import { MessageEditor } from "../../components/MessageEditor.jsx";
 import {
     createTemplate,
     extractAllVariables,
@@ -12,6 +19,7 @@ import {
     type ModelConfig,
 } from "../../types.js";
 import { ofetch } from "../../api.js";
+import { TemplateEditor } from "../../components/TemplateEditor/index.js";
 
 // 定义请求负载类型
 interface RequestPayload {
@@ -33,18 +41,18 @@ export { setDefaultMessage };
 export const PlayGround = () => {
     // 状态管理
     const [messages, setMessages] = createSignal<MessagesTemplate[]>(
-        defaultMessage()
+        defaultMessage(),
     );
     const [inputs, setInputs] = createSignal<Record<string, string>>({});
 
     const [modelConfigs] = createStoreSignal("modelConfigs", []);
     const [selectedModelId, setSelectedModelId] = createStoreSignal(
         "selectedModelId",
-        undefined
+        undefined,
     );
     const selectedConfig = createMemo(() => {
         return modelConfigs().find(
-            (c: ModelConfig) => c.id === selectedModelId()
+            (c: ModelConfig) => c.id === selectedModelId(),
         );
     });
 
@@ -55,7 +63,7 @@ export const PlayGround = () => {
 
     // Tab 状态管理
     const [activeTab, setActiveTab] = createSignal<"schema" | "tools" | null>(
-        null
+        null,
     ); // null, 'schema', 'tools'
 
     // Request payload for createResource
@@ -117,7 +125,7 @@ export const PlayGround = () => {
                                 }
                                 try {
                                     const data = JSON.parse(
-                                        line.slice(6).trim()
+                                        line.slice(6).trim(),
                                     );
                                     chunks.push(data);
                                     setStreamContent([...chunks]);
@@ -153,11 +161,11 @@ export const PlayGround = () => {
 
                 return { type: "invoke", data: response };
             }
-        }
+        },
     );
 
     const variables = createMemo(() => {
-        return extractAllVariables(messages());
+        return extractAllVariables(messages()) as string[];
     });
 
     // 更新输入变量的值
@@ -178,7 +186,7 @@ export const PlayGround = () => {
     // 更新消息
     const updateMessage = (index: number, newTemplate: MessagesTemplate) => {
         setMessages((prev) =>
-            prev.map((template, i) => (i === index ? newTemplate : template))
+            prev.map((template, i) => (i === index ? newTemplate : template)),
         );
     };
 
@@ -219,7 +227,8 @@ export const PlayGround = () => {
                                 commitTestRun("invoke");
                             }}
                             disabled={response.loading}
-                            class="px-5 py-2 bg-green-600 text-white rounded-l-lg flex items-center font-medium shadow-sm transition-colors duration-150 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed border-r border-green-700">
+                            class="px-4 py-1 bg-green-600 text-white rounded-l border-r border-green-700 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        >
                             运行
                         </button>
                         <button
@@ -227,8 +236,9 @@ export const PlayGround = () => {
                                 commitTestRun("stream");
                             }}
                             disabled={response.loading}
-                            class="px-3 py-2 bg-green-600 text-white rounded-r-lg flex items-center font-medium shadow-sm transition-colors duration-150 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                            title="流式运行">
+                            class="px-3 py-1 bg-green-600 text-white rounded-r hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                            title="流式运行"
+                        >
                             流式
                         </button>
                     </div>
@@ -250,7 +260,8 @@ export const PlayGround = () => {
                                 <button
                                     onClick={() => setShowModelModal(true)}
                                     class="p-2 border-l border-gray-300 hover:bg-gray-100"
-                                    title="Manage Models">
+                                    title="Manage Models"
+                                >
                                     <Settings />
                                 </button>
                             </div>
@@ -260,10 +271,11 @@ export const PlayGround = () => {
                     {/* Messages Section */}
                     <div class="flex-1 flex flex-col min-h-0">
                         <div class="flex-1 overflow-y-auto space-y-3 pr-2">
-                            <MessageEditor
+                            <TemplateEditor
                                 messages={messages()}
                                 onUpdateMessage={updateMessage}
                                 onRemoveMessage={removeMessage}
+                                variables={variables()}
                             />
                         </div>
 
@@ -271,7 +283,8 @@ export const PlayGround = () => {
                         <div class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
                             <button
                                 onClick={addMessage}
-                                class="px-3 py-1 text-sm border border-gray-300 rounded-md flex items-center bg-white hover:bg-gray-100">
+                                class="px-3 py-1 text-sm border border-gray-300 rounded-md flex items-center bg-white hover:bg-gray-100"
+                            >
                                 <Plus /> Message
                             </button>
                             <button
@@ -279,7 +292,7 @@ export const PlayGround = () => {
                                     setActiveTab(
                                         activeTab() === "schema"
                                             ? null
-                                            : "schema"
+                                            : "schema",
                                     )
                                 }
                                 class={
@@ -287,13 +300,16 @@ export const PlayGround = () => {
                                     (activeTab() === "schema"
                                         ? "bg-blue-100 border-blue-300"
                                         : "bg-white border-gray-300")
-                                }>
+                                }
+                            >
                                 <Plus /> Output Schema
                             </button>
                             <button
                                 onClick={() =>
                                     setActiveTab(
-                                        activeTab() === "tools" ? null : "tools"
+                                        activeTab() === "tools"
+                                            ? null
+                                            : "tools",
                                     )
                                 }
                                 class={
@@ -301,7 +317,8 @@ export const PlayGround = () => {
                                     (activeTab() === "tools"
                                         ? "bg-blue-100 border-blue-300"
                                         : "bg-white border-gray-300")
-                                }>
+                                }
+                            >
                                 <Plus /> Tool
                             </button>
                         </div>
@@ -320,7 +337,8 @@ export const PlayGround = () => {
                                             (activeTab() === "schema"
                                                 ? "bg-blue-50 text-blue-700 border-b-2 border-blue-500"
                                                 : "text-gray-500 hover:text-gray-700")
-                                        }>
+                                        }
+                                    >
                                         Output Schema
                                     </button>
                                     <button
@@ -330,14 +348,16 @@ export const PlayGround = () => {
                                             (activeTab() === "tools"
                                                 ? "bg-blue-50 text-blue-700 border-b-2 border-blue-500"
                                                 : "text-gray-500 hover:text-gray-700")
-                                        }>
+                                        }
+                                    >
                                         Tools
                                     </button>
                                     <div class="flex-1"></div>
                                     <button
                                         onClick={() => setActiveTab(null)}
                                         class="px-3 py-2 text-gray-400 hover:text-gray-600"
-                                        title="关闭">
+                                        title="关闭"
+                                    >
                                         <X />
                                     </button>
                                 </div>
@@ -353,12 +373,13 @@ export const PlayGround = () => {
                                                 value={outputSchemaText()}
                                                 onChange={(e) =>
                                                     setOutputSchemaText(
-                                                        e.currentTarget.value
+                                                        e.currentTarget.value,
                                                     )
                                                 }
                                                 placeholder=""
                                                 class="w-full p-2 border border-gray-300 rounded-md font-mono text-sm resize-none"
-                                                rows={8}></textarea>
+                                                rows={8}
+                                            ></textarea>
                                         </div>
                                     </Show>
                                     <Show when={activeTab() === "tools"}>
@@ -370,12 +391,13 @@ export const PlayGround = () => {
                                                 value={toolsText()}
                                                 onInput={(e) =>
                                                     setToolsText(
-                                                        e.currentTarget.value
+                                                        e.currentTarget.value,
                                                     )
                                                 }
                                                 placeholder=""
                                                 class="w-full p-2 border border-gray-300 rounded-md font-mono text-sm resize-none"
-                                                rows={8}></textarea>
+                                                rows={8}
+                                            ></textarea>
                                         </div>
                                     </Show>
                                 </div>
@@ -404,7 +426,7 @@ export const PlayGround = () => {
                                             onChange={(e) =>
                                                 handleInputChange(
                                                     variable,
-                                                    e.currentTarget.value
+                                                    e.currentTarget.value,
                                                 )
                                             }
                                             class="w-full mt-1 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400"
@@ -427,52 +449,52 @@ export const PlayGround = () => {
                             Output
                         </h2>
                         <div class="flex-1 overflow-auto bg-gray-50 rounded-md p-3 text-sm">
-                            <Show when={response.loading}>
-                                <p class="text-gray-500">Generating...</p>
-                            </Show>
-                            <Show when={response.error}>
-                                {(error) => (
+                            <Switch>
+                                <Match when={response.error}>
                                     <p class="text-red-500">
                                         Error:{" "}
-                                        {(error() as Error)?.message ||
-                                            String(error())}
+                                        {(response.error as Error)?.message ||
+                                            String(response.error)}
                                     </p>
-                                )}
-                            </Show>
-                            <Show
-                                when={
-                                    !response.loading &&
-                                    response()?.type === "stream"
-                                }>
-                                <GraphStateMessage
-                                    state={{
-                                        messages: composedStreamContent(),
-                                    }}
-                                    reverse={() => false}
-                                />
-                            </Show>
-                            <Show
-                                when={
-                                    !response.loading &&
-                                    response()?.type === "invoke"
-                                }>
-                                <GraphStateMessage
-                                    state={{
-                                        messages: [response()!.data],
-                                    }}
-                                    reverse={() => false}
-                                />
-                            </Show>
-                            <Show
-                                when={
-                                    !response.loading &&
-                                    !response() &&
-                                    !streamContent()?.length
-                                }>
-                                <p class="text-gray-500">
-                                    Click Start to run generation...
-                                </p>
-                            </Show>
+                                </Match>
+                                <Match
+                                    when={
+                                        response.loading &&
+                                        requestPayload()?.type === "invoke"
+                                    }
+                                >
+                                    <p class="text-gray-500">Generating...</p>
+                                </Match>
+                                <Match
+                                    when={requestPayload()?.type === "stream"}
+                                >
+                                    <GraphStateMessage
+                                        state={{
+                                            messages: composedStreamContent(),
+                                        }}
+                                        reverse={() => false}
+                                    />
+                                </Match>
+                                <Match when={response()?.type === "invoke"}>
+                                    <GraphStateMessage
+                                        state={{
+                                            messages: [response()!.data],
+                                        }}
+                                        reverse={() => false}
+                                    />
+                                </Match>
+                                <Match
+                                    when={
+                                        !response.loading &&
+                                        !response() &&
+                                        !streamContent()?.length
+                                    }
+                                >
+                                    <p class="text-gray-500">
+                                        Click Start to run generation...
+                                    </p>
+                                </Match>
+                            </Switch>
                         </div>
                     </div>
                 </div>
