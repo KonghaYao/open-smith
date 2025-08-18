@@ -82,7 +82,7 @@ app.use(
         root: "./",
         getContent: async (path) => {
             return fs.readFileSync(
-                uiPath + path.replace(/.*\/ui\//, ""),
+                uiPath + path.split("ui/")[1],
                 "utf-8"
             );
         },
@@ -255,8 +255,8 @@ app.notFound(async (c) => {
 
     console.log(
         "\n--- Incoming Request as Curl Command ---\n" +
-            curlCommand +
-            "\n--------------------------------------\n"
+        curlCommand +
+        "\n--------------------------------------\n"
     );
 
     return c.text("404 Not Found", 404);
