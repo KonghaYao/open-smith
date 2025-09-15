@@ -108,7 +108,7 @@ export class RunRepository {
     // 更新 Run
     async updateRun(
         runId: string,
-        runData: RunPayload
+        runData: RunPayload,
     ): Promise<RunRecord | null> {
         const now = new Date().toISOString();
         const updateFields: string[] = [];
@@ -117,66 +117,66 @@ export class RunRepository {
 
         if (runData.trace_id !== undefined) {
             updateFields.push(
-                `trace_id = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `trace_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(runData.trace_id);
         }
         if (runData.name !== undefined) {
             updateFields.push(
-                `name = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `name = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(runData.name);
         }
         if (runData.run_type !== undefined) {
             updateFields.push(
-                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(runData.run_type);
         }
         if (runData.system !== undefined) {
             updateFields.push(
-                `system = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `system = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(runData.system);
         }
         if (runData.start_time !== undefined) {
             updateFields.push(
-                `start_time = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `start_time = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(formatTimestamp(runData.start_time));
         }
         if (runData.end_time !== undefined) {
             updateFields.push(
-                `end_time = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `end_time = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(formatTimestamp(runData.end_time));
         }
         if (runData.inputs !== undefined) {
             updateFields.push(
-                `inputs = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `inputs = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(JSON.stringify(runData.inputs));
         }
         if (runData.outputs !== undefined) {
             updateFields.push(
-                `outputs = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `outputs = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(JSON.stringify(runData.outputs));
 
             // 如果 outputs 被更新，重新计算并更新 total_tokens
             updateFields.push(
-                `total_tokens = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `total_tokens = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(extractTotalTokensFromOutputs(runData.outputs));
 
             // 如果 outputs 被更新，重新计算并更新 model_name
             updateFields.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(extractModelNameFromOutputs(runData.outputs));
         } else if (runData.total_tokens !== undefined) {
             updateFields.push(
-                `total_tokens = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `total_tokens = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(runData.total_tokens);
         }
@@ -185,35 +185,35 @@ export class RunRepository {
         // 并且模型名称需要单独更新，则添加 model_name 到更新字段
         if (runData.model_name !== undefined && runData.outputs === undefined) {
             updateFields.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(runData.model_name);
         }
 
         if (runData.events !== undefined) {
             updateFields.push(
-                `events = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `events = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(JSON.stringify(runData.events));
             // 如果 events 被更新，重新计算并更新 time_to_first_token
             updateFields.push(
                 `time_to_first_token = ${this.adapter.getPlaceholder(
-                    paramIndex++
-                )}`
+                    paramIndex++,
+                )}`,
             );
             updateValues.push(
-                extractTimeToFirstTokenFromEvents(runData.events)
+                extractTimeToFirstTokenFromEvents(runData.events),
             );
         }
         if (runData.error !== undefined) {
             updateFields.push(
-                `error = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `error = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(JSON.stringify(runData.error));
         }
         if (runData.extra !== undefined) {
             updateFields.push(
-                `extra = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `extra = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(JSON.stringify(runData.extra));
 
@@ -223,8 +223,8 @@ export class RunRepository {
                 if (threadId) {
                     updateFields.push(
                         `thread_id = ${this.adapter.getPlaceholder(
-                            paramIndex++
-                        )}`
+                            paramIndex++,
+                        )}`,
                     );
                     updateValues.push(threadId);
                 }
@@ -234,35 +234,35 @@ export class RunRepository {
             const userId = extractUserIdFromExtra(runData.extra);
             if (userId) {
                 updateFields.push(
-                    `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`
+                    `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
                 );
                 updateValues.push(userId);
             }
         }
         if (runData.thread_id !== undefined) {
             updateFields.push(
-                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(runData.thread_id);
         }
         if (runData.serialized !== undefined) {
             updateFields.push(
-                `serialized = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `serialized = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(JSON.stringify(runData.serialized));
         }
         if (runData.total_tokens !== undefined) {
             updateFields.push(
-                `total_tokens = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `total_tokens = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(runData.total_tokens);
         }
         if ((runData as any).tags !== undefined) {
             updateFields.push(
-                `tags = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `tags = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             updateValues.push(
-                (runData as any).tags ? (runData as any).tags.join(",") : null
+                (runData as any).tags ? (runData as any).tags.join(",") : null,
             );
         }
 
@@ -271,14 +271,14 @@ export class RunRepository {
         }
 
         updateFields.push(
-            `updated_at = ${this.adapter.getPlaceholder(paramIndex++)}`
+            `updated_at = ${this.adapter.getPlaceholder(paramIndex++)}`,
         );
         updateValues.push(now);
         updateValues.push(runId);
 
         const stmt = await this.adapter.prepare(`
             UPDATE runs SET ${updateFields.join(
-                ", "
+                ", ",
             )} WHERE id = ${this.adapter.getPlaceholder(paramIndex)}
         `);
 
@@ -296,16 +296,16 @@ export class RunRepository {
         runId: string,
         field: string,
         value: any,
-        json = true
+        json = true,
     ): Promise<RunRecord | null> {
         const now = new Date().toISOString();
         const jsonValue = json ? JSON.stringify(value) : value;
 
         const stmt = await this.adapter.prepare(`
             UPDATE runs SET ${field} = ${this.adapter.getPlaceholder(
-            1
+            1,
         )}, updated_at = ${this.adapter.getPlaceholder(
-            2
+            2,
         )} WHERE id = ${this.adapter.getPlaceholder(3)}
         `);
 
@@ -317,7 +317,7 @@ export class RunRepository {
                 runId,
                 "total_tokens",
                 total_tokens,
-                false
+                false,
             );
             const model_name = extractModelNameFromOutputs(value);
             await this.updateRunField(runId, "model_name", model_name, false);
@@ -329,13 +329,17 @@ export class RunRepository {
                 runId,
                 "time_to_first_token",
                 time_to_first_token,
-                false
+                false,
             );
         }
-        if (field === "user_id") {
-            await this.updateRunField(runId, "user_id", value, false);
+        if (field === "extra") {
+            const thread_id = extractThreadIdFromExtra(value);
+            if (thread_id)
+                await this.updateRunField(runId, "thread_id", thread_id, false);
+            const user_id = extractUserIdFromExtra(value);
+            if (user_id)
+                await this.updateRunField(runId, "user_id", user_id, false);
         }
-
         if (result.changes === 0) {
             return null;
         }
@@ -346,7 +350,7 @@ export class RunRepository {
     // 获取 Run
     async getRun(runId: string): Promise<RunRecord | null> {
         const stmt = await this.adapter.prepare(
-            `SELECT * FROM runs WHERE id = ${this.adapter.getPlaceholder(1)}`
+            `SELECT * FROM runs WHERE id = ${this.adapter.getPlaceholder(1)}`,
         );
         const result = (await stmt.get([runId])) as RunRecord;
         return result || null;
@@ -356,8 +360,8 @@ export class RunRepository {
     async getRunsByTraceId(traceId: string): Promise<RunRecord[]> {
         const stmt = await this.adapter.prepare(
             `SELECT * FROM runs WHERE trace_id = ${this.adapter.getPlaceholder(
-                1
-            )} ORDER BY created_at`
+                1,
+            )} ORDER BY created_at`,
         );
         return (await stmt.all([traceId])) as RunRecord[];
     }
@@ -366,8 +370,8 @@ export class RunRepository {
     async getRunsBySystem(system: string): Promise<RunRecord[]> {
         const stmt = await this.adapter.prepare(
             `SELECT * FROM runs WHERE system = ${this.adapter.getPlaceholder(
-                1
-            )} ORDER BY created_at DESC`
+                1,
+            )} ORDER BY created_at DESC`,
         );
         return (await stmt.all([system])) as RunRecord[];
     }
@@ -376,8 +380,8 @@ export class RunRepository {
     async getRunsByThreadId(threadId: string): Promise<RunRecord[]> {
         const stmt = await this.adapter.prepare(
             `SELECT * FROM runs WHERE thread_id = ${this.adapter.getPlaceholder(
-                1
-            )} ORDER BY created_at DESC`
+                1,
+            )} ORDER BY created_at DESC`,
         );
         return (await stmt.all([threadId])) as RunRecord[];
     }
@@ -386,8 +390,8 @@ export class RunRepository {
     async getRunsByUserId(userId: string): Promise<RunRecord[]> {
         const stmt = await this.adapter.prepare(
             `SELECT * FROM runs WHERE user_id = ${this.adapter.getPlaceholder(
-                1
-            )} ORDER BY created_at DESC`
+                1,
+            )} ORDER BY created_at DESC`,
         );
         return (await stmt.all([userId])) as RunRecord[];
     }
@@ -396,14 +400,14 @@ export class RunRepository {
     async getRunsByRunType(
         runType: string,
         limit: number,
-        offset: number
+        offset: number,
     ): Promise<RunRecord[]> {
         const stmt = await this.adapter.prepare(`
             SELECT * FROM runs
             WHERE run_type = ${this.adapter.getPlaceholder(1)}
             ORDER BY created_at DESC
             LIMIT ${this.adapter.getPlaceholder(
-                2
+                2,
             )} OFFSET ${this.adapter.getPlaceholder(3)}
         `);
         return (await stmt.all([runType, limit, offset])) as RunRecord[];
@@ -433,7 +437,7 @@ export class RunRepository {
             start_time_before?: string;
         },
         limit: number,
-        offset: number
+        offset: number,
     ): Promise<RunRecord[]> {
         const whereConditions: string[] = [];
         const values: any[] = [];
@@ -441,51 +445,51 @@ export class RunRepository {
 
         if (conditions.run_type) {
             whereConditions.push(
-                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.run_type);
         }
         if (conditions.system) {
             whereConditions.push(
-                `system = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `system = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.system);
         }
         if (conditions.model_name) {
             whereConditions.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.model_name);
         }
         if (conditions.thread_id) {
             whereConditions.push(
-                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.thread_id);
         }
         if (conditions.user_id) {
             whereConditions.push(
-                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.user_id);
         }
         if (conditions.tag) {
             whereConditions.push(
                 `tags IS NOT NULL AND tags LIKE ${this.adapter.getPlaceholder(
-                    paramIndex++
-                )}`
+                    paramIndex++,
+                )}`,
             );
             values.push(`%"${conditions.tag}"%`);
         }
         if (conditions.start_time_after) {
             whereConditions.push(
-                `start_time >= ${this.adapter.getPlaceholder(paramIndex++)}`
+                `start_time >= ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(new Date(conditions.start_time_after).getTime());
         }
         if (conditions.start_time_before) {
             whereConditions.push(
-                `start_time <= ${this.adapter.getPlaceholder(paramIndex++)}`
+                `start_time <= ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(new Date(conditions.start_time_before).getTime());
         }
@@ -524,51 +528,51 @@ export class RunRepository {
 
         if (conditions.user_id) {
             whereConditions.push(
-                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.user_id);
         }
         if (conditions.run_type) {
             whereConditions.push(
-                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.run_type);
         }
         if (conditions.system) {
             whereConditions.push(
-                `system = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `system = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.system);
         }
         if (conditions.model_name) {
             whereConditions.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.model_name);
         }
         if (conditions.thread_id) {
             whereConditions.push(
-                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`
+                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(conditions.thread_id);
         }
         if (conditions.tag) {
             whereConditions.push(
                 `tags IS NOT NULL AND tags LIKE ${this.adapter.getPlaceholder(
-                    paramIndex++
-                )}`
+                    paramIndex++,
+                )}`,
             );
             values.push(`%"${conditions.tag}"%`);
         }
         if (conditions.start_time_after) {
             whereConditions.push(
-                `start_time >= ${this.adapter.getPlaceholder(paramIndex++)}`
+                `start_time >= ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(new Date(conditions.start_time_after).getTime());
         }
         if (conditions.start_time_before) {
             whereConditions.push(
-                `start_time <= ${this.adapter.getPlaceholder(paramIndex++)}`
+                `start_time <= ${this.adapter.getPlaceholder(paramIndex++)}`,
             );
             values.push(new Date(conditions.start_time_before).getTime());
         }

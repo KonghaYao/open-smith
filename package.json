@@ -1,7 +1,7 @@
 {
     "name": "@langgraph-js/open-smith",
     "type": "module",
-    "version": "1.3.1",
+    "version": "1.3.3",
     "description": "Open Smith",
     "author": "KonghaYao",
     "license": "Apache-2.0",
