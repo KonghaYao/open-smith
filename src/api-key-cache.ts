@@ -8,15 +8,24 @@ export class ApiKeyCache {
     >();
     private readonly TTL = 5 * 60 * 1000; // 5分钟TTL
     private db: TraceDatabase;
+    private allowVoid = !process.env.MASTER_KEY;
 
     constructor(database: TraceDatabase) {
         this.db = database;
         // 每分钟清理过期缓存
         setInterval(() => this.cleanup(), 60 * 1000);
+        if (this.allowVoid) {
+            console.log("Allow void API key");
+        }
     }
 
-    async getSystemNameByApiKey(apiKey: string): Promise<string | null> {
-        if (!apiKey) return null;
+    async getSystemNameByApiKey(apiKey?: string): Promise<string | null> {
+        if (!apiKey || apiKey === "undefined") {
+            if (this.allowVoid) {
+                return "anonymous";
+            }
+            return null;
+        }
 
         // 检查缓存
         const cached = this.cache.get(apiKey);

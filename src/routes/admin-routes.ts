@@ -2,10 +2,6 @@ import { Hono } from "hono";
 import { TraceDatabase } from "../database.js";
 import { ApiKeyCache } from "../api-key-cache.js"; // 更新导入路径
 
-if (!process.env.MASTER_KEY) {
-    throw new Error("MASTER_KEY 环境变量未设置");
-}
-
 export const createAdminRouter = (
     db: TraceDatabase,
     apiKeyCache: ApiKeyCache,
@@ -13,41 +9,44 @@ export const createAdminRouter = (
     const admin = new Hono();
 
     // 鉴权中间件：要求请求头中包含有效的 Authorization: Bearer <MASTER_KEY>
-    admin.use("/*", async (c, next) => {
-        const authHeader = c.req.header("Authorization");
-        const expectedMasterKey = process.env.MASTER_KEY;
+    process.env.MASTER_KEY &&
+        admin.use("/*", async (c, next) => {
+            const authHeader = c.req.header("Authorization");
+            const expectedMasterKey = process.env.MASTER_KEY;
 
-        if (!expectedMasterKey) {
-            console.warn("MASTER_KEY 环境变量未设置，admin 接口将无法访问。");
-            return c.json(
-                {
-                    success: false,
-                    message: "服务器配置错误：MASTER_KEY 未设置",
-                },
-                500,
-            );
-        }
+            if (!expectedMasterKey) {
+                console.warn(
+                    "MASTER_KEY 环境变量未设置，admin 接口将无法访问。",
+                );
+                return c.json(
+                    {
+                        success: false,
+                        message: "服务器配置错误：MASTER_KEY 未设置",
+                    },
+                    500,
+                );
+            }
 
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            return c.json(
-                {
-                    success: false,
-                    message: "未提供有效的认证凭证 (Bearer Token)",
-                },
-                401,
-            );
-        }
+            if (!authHeader || !authHeader.startsWith("Bearer ")) {
+                return c.json(
+                    {
+                        success: false,
+                        message: "未提供有效的认证凭证 (Bearer Token)",
+                    },
+                    401,
+                );
+            }
 
-        const masterKey = authHeader.substring(7); // 移除 "Bearer " 前缀
+            const masterKey = authHeader.substring(7); // 移除 "Bearer " 前缀
 
-        if (masterKey !== expectedMasterKey) {
-            return c.json(
-                { success: false, message: "认证失败：无效的 Master Key" },
-                401,
-            );
-        }
-        await next();
-    });
+            if (masterKey !== expectedMasterKey) {
+                return c.json(
+                    { success: false, message: "认证失败：无效的 Master Key" },
+                    401,
+                );
+            }
+            await next();
+        });
 
     // API Key 缓存管理接口
     admin.get("/cache/stats", (c) => {

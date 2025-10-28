@@ -13,17 +13,16 @@ export const createRunsRouter = (
         c: any,
     ): Promise<string | undefined> {
         const apiKey = c.req.raw.headers.get("x-api-key");
-        if (!apiKey) return undefined;
-
         const systemName = await apiKeyCache.getSystemNameByApiKey(apiKey);
         return systemName || undefined;
     }
 
     // API Key 验证和日志中间件
     runs.use("/*", async (c, next) => {
-        const apiKey = c.req.raw.headers.get("x-api-key");
+        const apiKey = c.req.header("x-api-key");
         if (apiKey) {
             const systemName = await apiKeyCache.getSystemNameByApiKey(apiKey);
+            // console.log({ apiKey, systemName });
             if (systemName) {
                 console.log(
                     `[API Request] System: ${systemName}, API Key: ${apiKey.substring(
