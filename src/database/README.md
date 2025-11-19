@@ -1,93 +1,100 @@
-# 数据库模块重构
+# 数据库重构：使用 Kysely
 
-此模块将原来的单一 `TraceDatabase` 类拆分为多个职责单一的模块，提高代码的可维护性和可扩展性。
+本项目已从自定义数据库适配器重构为使用 [Kysely](https://kysely.dev/) 查询构建器。
 
-## 文件结构
+## 主要改动
 
-```
-src/database/
-├── interfaces.ts           # 数据库适配器接口定义
-├── base-database.ts        # 基础数据库类（表初始化、事务等）
-├── utils.ts               # 工具函数（数据提取、格式化等）
-├── repositories/          # 各功能仓库类
-│   ├── system-repository.ts    # 系统管理相关操作
-│   ├── run-repository.ts       # Run 记录相关操作
-│   ├── feedback-repository.ts  # 反馈相关操作
-│   ├── attachment-repository.ts # 附件相关操作
-│   └── trace-repository.ts     # Trace 相关操作
-├── index.ts               # 主入口文件，组合所有功能
-└── README.md              # 本文档
-```
+### 1. Schema 定义
 
-## 主要改进
-
-1. **职责分离**: 将不同的数据库操作分离到专门的仓库类中
-2. **代码复用**: 提取公共工具函数到 `utils.ts`
-3. **接口抽象**: 将数据库适配器接口独立定义
-4. **易于维护**: 每个文件职责单一，便于后续维护和扩展
-5. **向后兼容**: 保持原有 API 不变，现有代码无需修改
-
-## 使用方法
+新增 `schema.ts`，定义了完整的数据库表结构类型：
 
 ```typescript
-import { TraceDatabase } from "./database.js";
-
-// 原有使用方式保持不变
-const db = new TraceDatabase(adapter);
-await db.init();
-
-// 所有原有方法都可以正常使用
-const run = await db.createRun(runData);
-const traces = await db.getAllTraces();
+import type { Database } from "./database/schema.js";
 ```
 
-## 各模块说明
+### 2. Dialect 适配器
 
-### `interfaces.ts`
+新增 `kysely-dialects.ts`，提供多种数据库适配器：
 
-定义了数据库适配器的标准接口，包括：
+-   **Bun SQLite**: `createBunSqliteKysely()` - Bun 运行时的 SQLite
+-   **Better-SQLite3**: `createBetterSqlite3Kysely()` - Node.js 环境的 SQLite
+-   **PostgreSQL**: `createPostgresKysely()` - PostgreSQL 数据库
+-   **自动检测**: `createKyselyInstance()` - 根据环境自动选择
 
--   `DatabaseAdapter`: 数据库适配器接口
--   `PreparedStatement`: 预处理语句接口
+### 3. 使用示例
 
-### `base-database.ts`
+```typescript
+// 创建数据库实例
+import { TraceDatabase, createKyselyInstance } from "./database.js";
 
-包含基础数据库功能：
+// 方式 1: 自动检测环境
+const kysely = createKyselyInstance();
 
--   表结构初始化
--   索引创建
--   事务管理
--   数据库连接关闭
+// 方式 2: 手动指定 Bun SQLite
+const kysely = createBunSqliteKysely("./.langgraph_api/trace.db");
 
-### `utils.ts`
+// 方式 3: PostgreSQL
+const kysely = createPostgresKysely({
+    connectionString: "postgresql://user:password@localhost:5432/db",
+});
 
-提供工具函数：
+// 初始化数据库
+const db = new TraceDatabase(kysely);
+await db.init();
 
--   时间戳格式化
--   API 密钥生成
--   从数据中提取特定字段（tokens、model_name 等）
+// 使用数据库
+const systems = await db.getAllSystemRecords();
+```
 
-### `repositories/`
+### 4. 迁移说明
 
-各功能模块的具体实现：
+**删除的文件：**
 
--   **SystemRepository**: 系统的增删改查、统计、迁移等
--   **RunRepository**: Run 记录的增删改查、条件查询等
--   **FeedbackRepository**: 反馈的创建和查询
--   **AttachmentRepository**: 附件的创建和查询
--   **TraceRepository**: Trace 的查询、统计、条件筛选等
+-   `src/database/interfaces.ts` - 旧的适配器接口
+-   `src/adapters/bun-sqlite-adapter.ts` - 旧的 Bun SQLite 适配器
+-   `src/adapters/pg-adapter.ts` - 旧的 PostgreSQL 适配器
+-   `src/adapters/better-sqlite-adapter.ts` - 旧的 Better-SQLite3 适配器
 
-### `index.ts`
+**新增的文件：**
 
-主入口文件，将所有仓库组合成完整的 `TraceDatabase` 类，保持向后兼容。
+-   `src/database/schema.ts` - 数据库表结构定义
+-   `src/database/kysely-dialects.ts` - Kysely dialect 适配器
 
-## 扩展指南
+**修改的文件：**
 
-如需添加新功能：
+-   `src/database/base-database.ts` - 使用 Kysely 而非自定义适配器
+-   `src/database/repositories/*.ts` - 所有 repository 都重构为使用 Kysely
+-   `src/database/index.ts` - 更新导出
+-   `src/app.ts` - 更新数据库初始化代码
 
-1. 如果是新的数据表，在对应目录创建新的仓库类
-2. 在 `base-database.ts` 中添加表结构定义
-3. 在 `index.ts` 中添加对应的方法代理
-4. 如果有公共逻辑，添加到 `utils.ts`
+## 优势
 
-这样的结构使得代码更容易理解、测试和维护。
+1. **类型安全**: Kysely 提供完整的 TypeScript 类型推导
+2. **跨数据库**: 统一的 API，轻松切换不同数据库
+3. **查询构建**: 使用链式 API 构建复杂查询，更加清晰
+4. **维护性**: 减少自定义代码，使用成熟的库
+5. **性能**: Kysely 针对性能进行了优化
+
+## Repository 示例
+
+```typescript
+// 旧的方式（已废弃）
+const stmt = await this.adapter.prepare(
+    `SELECT * FROM systems WHERE id = ${this.adapter.getPlaceholder(1)}`,
+);
+const result = await stmt.get([id]);
+
+// 新的方式（使用 Kysely）
+const result = await this.db
+    .selectFrom("systems")
+    .selectAll()
+    .where("id", "=", id)
+    .executeTakeFirst();
+```
+
+## 环境变量
+
+保持与之前相同：
+
+-   `TRACE_DATABASE_URL`: PostgreSQL 连接字符串（可选）
+-   未设置时自动使用 SQLite（根据运行环境选择 Bun 或 Better-SQLite3）

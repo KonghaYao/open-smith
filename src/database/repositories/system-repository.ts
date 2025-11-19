@@ -1,16 +1,17 @@
 import { v4 as uuidv4 } from "uuid";
-import type { DatabaseAdapter } from "../interfaces.js";
+import { sql, type Kysely } from "kysely";
+import type { Database } from "../schema.js";
 import type { SystemRecord } from "../../types.js";
 import { generateApiKey } from "../utils.js";
 
 export class SystemRepository {
-    constructor(private adapter: DatabaseAdapter) {}
+    constructor(private db: Kysely<Database>) {}
 
     // 创建系统
     async createSystem(
         name: string,
         description?: string,
-        apiKey?: string
+        apiKey?: string,
     ): Promise<SystemRecord> {
         const id = uuidv4();
         const finalApiKey = apiKey || generateApiKey();
@@ -26,99 +27,115 @@ export class SystemRepository {
             updated_at: now,
         };
 
-        const stmt = await this.adapter.prepare(`
-            INSERT INTO systems (
-                id, name, description, api_key, status, created_at, updated_at
-            ) VALUES (${this.adapter.getPlaceholder(
-                1
-            )}, ${this.adapter.getPlaceholder(
-            2
-        )}, ${this.adapter.getPlaceholder(3)}, ${this.adapter.getPlaceholder(
-            4
-        )}, ${this.adapter.getPlaceholder(5)}, ${this.adapter.getPlaceholder(
-            6
-        )}, ${this.adapter.getPlaceholder(7)})
-        `);
-
-        await stmt.run([
-            record.id,
-            record.name,
-            record.description,
-            record.api_key,
-            record.status,
-            record.created_at,
-            record.updated_at,
-        ]);
+        await this.db
+            .insertInto("systems")
+            .values({
+                id: record.id,
+                name: record.name,
+                description: record.description ?? null,
+                api_key: record.api_key,
+                status: record.status,
+                created_at: record.created_at,
+                updated_at: record.updated_at,
+            })
+            .execute();
 
         return record;
     }
 
     // 根据API密钥获取系统
     async getSystemByApiKey(apiKey: string): Promise<SystemRecord | null> {
-        const stmt = await this.adapter.prepare(
-            `SELECT * FROM systems WHERE api_key = ${this.adapter.getPlaceholder(
-                1
-            )} AND status = 'active'`
-        );
-        const result = (await stmt.get([apiKey])) as SystemRecord;
-        return result || null;
+        const result = await this.db
+            .selectFrom("systems")
+            .selectAll()
+            .where("api_key", "=", apiKey)
+            .where("status", "=", "active")
+            .executeTakeFirst();
+
+        return result
+            ? {
+                  ...result,
+                  description: result.description ?? undefined,
+              }
+            : null;
     }
 
     // 根据名称获取系统
     async getSystemByName(name: string): Promise<SystemRecord | null> {
-        const stmt = await this.adapter.prepare(
-            `SELECT * FROM systems WHERE name = ${this.adapter.getPlaceholder(
-                1
-            )}`
-        );
-        const result = (await stmt.get([name])) as SystemRecord;
-        return result || null;
+        const result = await this.db
+            .selectFrom("systems")
+            .selectAll()
+            .where("name", "=", name)
+            .executeTakeFirst();
+
+        return result
+            ? {
+                  ...result,
+                  description: result.description ?? undefined,
+              }
+            : null;
     }
 
     // 根据ID获取系统
     async getSystemById(id: string): Promise<SystemRecord | null> {
-        const stmt = await this.adapter.prepare(
-            `SELECT * FROM systems WHERE id = ${this.adapter.getPlaceholder(1)}`
-        );
-        const result = (await stmt.get([id])) as SystemRecord;
-        return result || null;
+        const result = await this.db
+            .selectFrom("systems")
+            .selectAll()
+            .where("id", "=", id)
+            .executeTakeFirst();
+
+        return result
+            ? {
+                  ...result,
+                  description: result.description ?? undefined,
+              }
+            : null;
     }
 
     // 获取所有系统记录
     async getAllSystemRecords(): Promise<SystemRecord[]> {
-        const stmt = await this.adapter.prepare(
-            `SELECT * FROM systems ORDER BY created_at DESC`
-        );
-        return (await stmt.all()) as SystemRecord[];
+        const results = await this.db
+            .selectFrom("systems")
+            .selectAll()
+            .orderBy("created_at", "desc")
+            .execute();
+
+        return results.map((r) => ({
+            ...r,
+            description: r.description ?? undefined,
+        }));
     }
 
     // 获取活跃系统
     async getActiveSystems(): Promise<SystemRecord[]> {
-        const stmt = await this.adapter.prepare(
-            `SELECT * FROM systems WHERE status = 'active' ORDER BY created_at DESC`
-        );
-        return (await stmt.all()) as SystemRecord[];
+        const results = await this.db
+            .selectFrom("systems")
+            .selectAll()
+            .where("status", "=", "active")
+            .orderBy("created_at", "desc")
+            .execute();
+
+        return results.map((r) => ({
+            ...r,
+            description: r.description ?? undefined,
+        }));
     }
 
     // 更新系统状态
     async updateSystemStatus(
         id: string,
-        status: "active" | "inactive"
+        status: "active" | "inactive",
     ): Promise<SystemRecord | null> {
         const now = new Date().toISOString();
 
-        const stmt = await this.adapter.prepare(`
-            UPDATE systems SET 
-                status = ${this.adapter.getPlaceholder(1)}, 
-                updated_at = ${this.adapter.getPlaceholder(2)} 
-            WHERE id = ${this.adapter.getPlaceholder(3)}
-        `);
-
-        const result = await stmt.run([status, now, id]);
-
-        if (result.changes === 0) {
-            return null;
-        }
+        await this.db
+            .updateTable("systems")
+            .set({
+                status,
+                updated_at: now,
+            })
+            .where("id", "=", id)
+            .execute();
 
         return this.getSystemById(id);
     }
@@ -130,53 +147,34 @@ export class SystemRepository {
             name?: string;
             description?: string;
             status?: "active" | "inactive";
-        }
+        },
     ): Promise<SystemRecord | null> {
         const now = new Date().toISOString();
-        const updateFields: string[] = [];
-        const updateValues: any[] = [];
-        let paramIndex = 1;
+
+        const updateData: Record<string, any> = {
+            updated_at: now,
+        };
 
         if (updates.name !== undefined) {
-            updateFields.push(
-                `name = ${this.adapter.getPlaceholder(paramIndex++)}`
-            );
-            updateValues.push(updates.name);
+            updateData.name = updates.name;
         }
         if (updates.description !== undefined) {
-            updateFields.push(
-                `description = ${this.adapter.getPlaceholder(paramIndex++)}`
-            );
-            updateValues.push(updates.description);
+            updateData.description = updates.description;
         }
         if (updates.status !== undefined) {
-            updateFields.push(
-                `status = ${this.adapter.getPlaceholder(paramIndex++)}`
-            );
-            updateValues.push(updates.status);
+            updateData.status = updates.status;
         }
 
-        if (updateFields.length === 0) {
+        if (Object.keys(updateData).length === 1) {
+            // 只有 updated_at，无需更新
             return this.getSystemById(id);
         }
 
-        updateFields.push(
-            `updated_at = ${this.adapter.getPlaceholder(paramIndex++)}`
-        );
-        updateValues.push(now);
-        updateValues.push(id);
-
-        const stmt = await this.adapter.prepare(`
-            UPDATE systems SET ${updateFields.join(
-                ", "
-            )} WHERE id = ${this.adapter.getPlaceholder(paramIndex)}
-        `);
-
-        const result = await stmt.run(updateValues);
-
-        if (result.changes === 0) {
-            return null;
-        }
+        await this.db
+            .updateTable("systems")
+            .set(updateData)
+            .where("id", "=", id)
+            .execute();
 
         return this.getSystemById(id);
     }
@@ -186,29 +184,26 @@ export class SystemRepository {
         const newApiKey = generateApiKey();
         const now = new Date().toISOString();
 
-        const stmt = await this.adapter.prepare(`
-            UPDATE systems SET 
-                api_key = ${this.adapter.getPlaceholder(1)}, 
-                updated_at = ${this.adapter.getPlaceholder(2)} 
-            WHERE id = ${this.adapter.getPlaceholder(3)}
-        `);
-
-        const result = await stmt.run([newApiKey, now, id]);
-
-        if (result.changes === 0) {
-            return null;
-        }
+        await this.db
+            .updateTable("systems")
+            .set({
+                api_key: newApiKey,
+                updated_at: now,
+            })
+            .where("id", "=", id)
+            .execute();
 
         return this.getSystemById(id);
     }
 
     // 删除系统
     async deleteSystem(id: string): Promise<boolean> {
-        const stmt = await this.adapter.prepare(
-            `DELETE FROM systems WHERE id = ${this.adapter.getPlaceholder(1)}`
-        );
-        const result = await stmt.run([id]);
-        return result.changes > 0;
+        const result = await this.db
+            .deleteFrom("systems")
+            .where("id", "=", id)
+            .executeTakeFirst();
+
+        return (result.numDeletedRows ?? 0n) > 0n;
     }
 
     // 确保系统存在的辅助方法
@@ -222,7 +217,7 @@ export class SystemRepository {
             // 如果系统不存在，自动创建一个
             system = await this.createSystem(
                 systemName,
-                `自动创建的系统: ${systemName}`
+                `自动创建的系统: ${systemName}`,
             );
         }
         return system;
@@ -238,60 +233,59 @@ export class SystemRepository {
         first_run_time?: string;
         last_run_time?: string;
     }> {
-        const runStatsStmt = await this.adapter.prepare(`
-            SELECT 
-                COUNT(*) as total_runs,
-                COUNT(DISTINCT trace_id) as total_traces,
-                COALESCE(SUM(total_tokens), 0) as total_tokens,
-                MIN(created_at) as first_run_time,
-                MAX(created_at) as last_run_time
-            FROM runs 
-            WHERE system = ${this.adapter.getPlaceholder(1)}
-        `);
+        const runStats = await this.db
+            .selectFrom("runs")
+            .select(({ fn }) => [
+                fn.count<number>("id").as("total_runs"),
+                sql<number>`COUNT(DISTINCT trace_id)`.as("total_traces"),
+                fn
+                    .coalesce(fn.sum<number>("total_tokens"), sql<number>`0`)
+                    .as("total_tokens"),
+                fn.min("created_at").as("first_run_time"),
+                fn.max("created_at").as("last_run_time"),
+            ])
+            .where("system", "=", systemName)
+            .executeTakeFirst();
 
-        const feedbackStatsStmt = await this.adapter.prepare(`
-            SELECT COUNT(*) as count 
-            FROM feedback f
-            JOIN runs r ON f.run_id = r.id 
-            WHERE r.system = ${this.adapter.getPlaceholder(1)}
-        `);
+        const feedbackStats = await this.db
+            .selectFrom("feedback")
+            .innerJoin("runs", "feedback.run_id", "runs.id")
+            .select(({ fn }) => [fn.count<number>("feedback.id").as("count")])
+            .where("runs.system", "=", systemName)
+            .executeTakeFirst();
 
-        const attachmentStatsStmt = await this.adapter.prepare(`
-            SELECT COUNT(*) as count 
-            FROM attachments a
-            JOIN runs r ON a.run_id = r.id 
-            WHERE r.system = ${this.adapter.getPlaceholder(1)}
-        `);
-
-        const runStats = (await runStatsStmt.get([systemName])) as any;
-        const feedbackStats = (await feedbackStatsStmt.get([
-            systemName,
-        ])) as any;
-        const attachmentStats = (await attachmentStatsStmt.get([
-            systemName,
-        ])) as any;
+        const attachmentStats = await this.db
+            .selectFrom("attachments")
+            .innerJoin("runs", "attachments.run_id", "runs.id")
+            .select(({ fn }) => [
+                fn.count<number>("attachments.id").as("count"),
+            ])
+            .where("runs.system", "=", systemName)
+            .executeTakeFirst();
 
         return {
-            total_runs: runStats.total_runs || 0,
-            total_traces: runStats.total_traces || 0,
-            total_tokens: runStats.total_tokens || 0,
-            total_feedback: feedbackStats.count || 0,
-            total_attachments: attachmentStats.count || 0,
-            first_run_time: runStats.first_run_time,
-            last_run_time: runStats.last_run_time,
+            total_runs: Number(runStats?.total_runs ?? 0),
+            total_traces: Number(runStats?.total_traces ?? 0),
+            total_tokens: Number(runStats?.total_tokens ?? 0),
+            total_feedback: Number(feedbackStats?.count ?? 0),
+            total_attachments: Number(attachmentStats?.count ?? 0),
+            first_run_time: runStats?.first_run_time ?? undefined,
+            last_run_time: runStats?.last_run_time ?? undefined,
         };
     }
 
     // 获取所有系统名称列表
     async getAllSystems(): Promise<string[]> {
-        const stmt = await this.adapter.prepare(`
-            SELECT DISTINCT system 
-            FROM runs 
-            WHERE system IS NOT NULL AND system != ''
-            ORDER BY system
-        `);
-        const results = (await stmt.all()) as { system: string }[];
-        return results.map((r) => r.system);
+        const results = await this.db
+            .selectFrom("runs")
+            .select("system")
+            .distinct()
+            .where("system", "is not", null)
+            .where("system", "!=", "")
+            .orderBy("system")
+            .execute();
+
+        return results.map((r) => r.system!);
     }
 
     // 数据迁移：为现有的runs记录创建对应的系统记录
@@ -311,7 +305,7 @@ export class SystemRepository {
             if (!existingSystem) {
                 await this.createSystem(
                     systemName,
-                    `从现有数据迁移: ${systemName}`
+                    `从现有数据迁移: ${systemName}`,
                 );
                 created++;
             } else {
@@ -324,16 +318,16 @@ export class SystemRepository {
 
     // 验证数据一致性：检查是否有runs记录的system字段不存在于systems表中
     async validateSystemReferences(): Promise<string[]> {
-        const stmt = await this.adapter.prepare(`
-            SELECT DISTINCT r.system 
-            FROM runs r 
-            LEFT JOIN systems s ON r.system = s.name 
-            WHERE r.system IS NOT NULL 
-              AND r.system != '' 
-              AND s.name IS NULL
-        `);
+        const result = await this.db
+            .selectFrom("runs")
+            .leftJoin("systems", "runs.system", "systems.name")
+            .select("runs.system")
+            .distinct()
+            .where("runs.system", "is not", null)
+            .where("runs.system", "!=", "")
+            .where("systems.name", "is", null)
+            .execute();
 
-        const result = (await stmt.all()) as { system: string }[];
-        return result.map((r) => r.system);
+        return result.map((r) => r.system!);
     }
 }

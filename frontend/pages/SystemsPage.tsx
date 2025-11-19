@@ -1,7 +1,7 @@
 import { createSignal, createResource, Show, For } from "solid-js";
 import { X, Plus } from "lucide-solid";
 import { Table, type TableColumn } from "../components/Table.jsx"; // 导入 Table 组件
-import { getMasterKey } from "../utils/master-key-manager.js"; // 导入 getMasterKey
+import { clearMasterKey, getMasterKey } from "../utils/master-key-manager.js"; // 导入 getMasterKey
 import { fetch } from "../api.js";
 import type { SystemRecord } from "../../src/types.js";
 import copy from "copy-to-clipboard";
@@ -34,7 +34,7 @@ export const SystemsPage = () => {
                 headers: getAuthHeaders(), // 添加认证头
             });
             return response.data || [];
-        }
+        },
     );
 
     // 创建新系统
@@ -110,7 +110,7 @@ export const SystemsPage = () => {
                 {
                     method: "POST",
                     headers: getAuthHeaders(), // 添加认证头
-                }
+                },
             );
 
             const result = response;
@@ -177,7 +177,8 @@ export const SystemsPage = () => {
                     <button
                         onClick={() => copyToClipboard(row.api_key)}
                         class="text-gray-400 hover:text-gray-600"
-                        title="复制完整 API Key">
+                        title="复制完整 API Key"
+                    >
                         复制
                     </button>
                 </div>
@@ -198,7 +199,8 @@ export const SystemsPage = () => {
                 <button
                     onClick={() => regenerateApiKey(row.id)}
                     class="text-blue-600 hover:text-blue-900 mr-3"
-                    title="重新生成 API Key">
+                    title="重新生成 API Key"
+                >
                     重置
                 </button>
                 // 保障安全，则不使用删除功能
@@ -224,12 +226,14 @@ export const SystemsPage = () => {
                             message()?.type === "error"
                                 ? "bg-red-50 border border-red-200 text-red-800"
                                 : "bg-green-50 border border-green-200 text-green-800"
-                        }`}>
+                        }`}
+                    >
                         <div class="flex justify-between items-center">
                             <span>{message()?.text} </span>
                             <button
                                 onClick={clearMessage}
-                                class="text-gray-500 hover:text-gray-700">
+                                class="text-gray-500 hover:text-gray-700"
+                            >
                                 <X class="w-4 h-4" />
                             </button>
                         </div>
@@ -251,7 +255,7 @@ export const SystemsPage = () => {
                                 value={newSystemName()}
                                 onInput={(e: Event) =>
                                     setNewSystemName(
-                                        (e.target as HTMLInputElement).value
+                                        (e.target as HTMLInputElement).value,
                                     )
                                 }
                                 placeholder="输入系统名称"
@@ -267,7 +271,7 @@ export const SystemsPage = () => {
                                 value={newSystemDescription()}
                                 onInput={(e: Event) =>
                                     setNewSystemDescription(
-                                        (e.target as HTMLInputElement).value
+                                        (e.target as HTMLInputElement).value,
                                     )
                                 }
                                 placeholder="输入系统描述（可选）"
@@ -283,7 +287,7 @@ export const SystemsPage = () => {
                                 value={newSystemApiKey()}
                                 onInput={(e: Event) =>
                                     setNewSystemApiKey(
-                                        (e.target as HTMLInputElement).value
+                                        (e.target as HTMLInputElement).value,
                                     )
                                 }
                                 placeholder="留空则自动生成"
@@ -295,7 +299,8 @@ export const SystemsPage = () => {
                         <button
                             onClick={createSystem}
                             disabled={isCreating()}
-                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
                             {isCreating() ? (
                                 <>
                                     <div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
@@ -318,6 +323,14 @@ export const SystemsPage = () => {
                         </h2>
                     </div>
                     <div class="overflow-x-auto">
+                        {systems.error && (
+                            <button
+                                class="text-red-500"
+                                onclick={() => clearMasterKey()}
+                            >
+                                LogOut
+                            </button>
+                        )}
                         <Table
                             columnsConfig={systemsTableColumns}
                             data={systems()}

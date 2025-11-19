@@ -6,7 +6,7 @@ import { HTTPException } from "hono/http-exception";
 // import { serveStatic } from "hono/bun";
 import { MultipartProcessor } from "./multipart-processor.js";
 import { createTraceRouter } from "./routes/trace-router.js";
-import { TraceDatabase, type DatabaseAdapter } from "./database.js";
+import { TraceDatabase, createKyselyInstance } from "./database.js";
 import { ApiKeyCache } from "./api-key-cache.js"; // 更新导入路径
 import { createAdminRouter } from "./routes/admin-routes.js";
 import { createRunsRouter } from "./routes/runs-routes.js";
@@ -25,29 +25,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = new Hono();
 
-let adapter: DatabaseAdapter;
+// 使用 Kysely 创建数据库实例
+let kysely = await createKyselyInstance({
+    connectionString: process.env.TRACE_DATABASE_URL || ":memory:",
+});
 
-if (process.env.TRACE_DATABASE_URL) {
-    const { PgAdapter } = await import("./adapters/pg-adapter.js");
-    adapter = new PgAdapter({
-        connectionString: process.env.TRACE_DATABASE_URL,
-    });
-} else if (
-    /** @ts-ignore */
-    typeof globalThis.Bun !== "undefined"
-) {
-    const { BunSQLiteAdapter } = await import(
-        "./adapters/bun-sqlite-adapter.js"
-    );
-    adapter = new BunSQLiteAdapter();
-} else {
-    const { BetterSqliteAdapter } = await import(
-        "./adapters/better-sqlite-adapter.js"
-    );
-    adapter = new BetterSqliteAdapter();
-}
-
-const db = new TraceDatabase(adapter!);
+const db = new TraceDatabase(kysely);
 await db.init();
 
 // 创建 API Key 缓存实例
@@ -81,12 +64,9 @@ app.use(
     serveStatic({
         root: "./",
         getContent: async (path) => {
-            return fs.readFileSync(
-                uiPath + path.split("ui/")[1],
-                "utf-8"
-            );
+            return fs.readFileSync(uiPath + path.split("ui/")[1], "utf-8");
         },
-    })
+    }),
 );
 
 // 挂载 trace 路由器
@@ -234,7 +214,7 @@ app.notFound(async (c) => {
             if (contentType?.includes("application/json")) {
                 const jsonBody = await c.req.json();
                 curlCommand += ` -H 'Content-Type: application/json' -d '${JSON.stringify(
-                    jsonBody
+                    jsonBody,
                 ).replace(/'/g, "'''")}'`;
             } else if (contentType?.includes("multipart/form-data")) {
                 // 对于 multipart/form-data，需要特殊处理，因为FormData()会消耗流
@@ -255,8 +235,8 @@ app.notFound(async (c) => {
 
     console.log(
         "\n--- Incoming Request as Curl Command ---\n" +
-        curlCommand +
-        "\n--------------------------------------\n"
+            curlCommand +
+            "\n--------------------------------------\n",
     );
 
     return c.text("404 Not Found", 404);

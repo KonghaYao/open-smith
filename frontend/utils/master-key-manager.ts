@@ -13,3 +13,6 @@ export const getMasterKey = () => {
     }
     return masterKey;
 };
+export const clearMasterKey = () => {
+    localStorage.removeItem("MASTER_KEY");
+};

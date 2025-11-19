@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
-import type { DatabaseAdapter } from "../interfaces.js";
+import type { Kysely } from "kysely";
+import type { Database } from "../schema.js";
 import type { RunRecord } from "../../types.js";
 import type { RunPayload } from "../../multipart-types.js";
 import {
@@ -12,7 +13,7 @@ import {
 } from "../utils.js";
 
 export class RunRepository {
-    constructor(private adapter: DatabaseAdapter) {}
+    constructor(private db: Kysely<Database>) {}
 
     // 创建 Run
     async createRun(runData: RunPayload): Promise<RunRecord> {
@@ -66,41 +67,32 @@ export class RunRepository {
             attachments: [],
         };
 
-        const commitData = [
-            record.id,
-            record.trace_id,
-            record.name,
-            record.run_type,
-            record.system,
-            record.model_name,
-            record.thread_id,
-            record.user_id,
-            record.start_time,
-            record.end_time,
-            record.inputs,
-            record.outputs,
-            record.events,
-            record.error,
-            record.extra,
-            record.serialized,
-            record.total_tokens,
-            record.created_at,
-            record.updated_at,
-            record.time_to_first_token,
-            record.tags,
-        ];
-
-        const stmt = await this.adapter.prepare(`
-            INSERT INTO runs (
-                id, trace_id, name, run_type, system, model_name, thread_id, user_id, start_time, end_time,
-                inputs, outputs, events, error, extra, serialized, total_tokens,
-                created_at, updated_at, time_to_first_token, tags
-            ) VALUES (${commitData
-                .map((item, index) => this.adapter.getPlaceholder(index + 1))
-                .join(",")})
-        `);
-
-        await stmt.run(commitData);
+        await this.db
+            .insertInto("runs")
+            .values({
+                id: record.id,
+                trace_id: record.trace_id ?? null,
+                name: record.name ?? null,
+                run_type: record.run_type ?? null,
+                system: record.system ?? null,
+                model_name: record.model_name ?? null,
+                thread_id: record.thread_id ?? null,
+                user_id: record.user_id ?? null,
+                start_time: record.start_time ?? null,
+                end_time: record.end_time ?? null,
+                inputs: record.inputs ?? null,
+                outputs: record.outputs ?? null,
+                events: record.events ?? null,
+                error: record.error ?? null,
+                extra: record.extra ?? null,
+                serialized: record.serialized ?? null,
+                total_tokens: record.total_tokens ?? 0,
+                created_at: record.created_at,
+                updated_at: record.updated_at,
+                time_to_first_token: record.time_to_first_token ?? 0,
+                tags: record.tags ?? null,
+            })
+            .execute();
 
         return record;
     }
@@ -111,180 +103,97 @@ export class RunRepository {
         runData: RunPayload,
     ): Promise<RunRecord | null> {
         const now = new Date().toISOString();
-        const updateFields: string[] = [];
-        const updateValues: any[] = [];
-        let paramIndex = 1;
+        const updateData: Record<string, any> = {};
 
         if (runData.trace_id !== undefined) {
-            updateFields.push(
-                `trace_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(runData.trace_id);
+            updateData.trace_id = runData.trace_id;
         }
         if (runData.name !== undefined) {
-            updateFields.push(
-                `name = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(runData.name);
+            updateData.name = runData.name;
         }
         if (runData.run_type !== undefined) {
-            updateFields.push(
-                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(runData.run_type);
+            updateData.run_type = runData.run_type;
         }
         if (runData.system !== undefined) {
-            updateFields.push(
-                `system = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(runData.system);
+            updateData.system = runData.system;
         }
         if (runData.start_time !== undefined) {
-            updateFields.push(
-                `start_time = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(formatTimestamp(runData.start_time));
+            updateData.start_time = formatTimestamp(runData.start_time);
         }
         if (runData.end_time !== undefined) {
-            updateFields.push(
-                `end_time = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(formatTimestamp(runData.end_time));
+            updateData.end_time = formatTimestamp(runData.end_time);
         }
         if (runData.inputs !== undefined) {
-            updateFields.push(
-                `inputs = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(JSON.stringify(runData.inputs));
+            updateData.inputs = JSON.stringify(runData.inputs);
         }
         if (runData.outputs !== undefined) {
-            updateFields.push(
-                `outputs = ${this.adapter.getPlaceholder(paramIndex++)}`,
+            updateData.outputs = JSON.stringify(runData.outputs);
+            updateData.total_tokens = extractTotalTokensFromOutputs(
+                runData.outputs,
             );
-            updateValues.push(JSON.stringify(runData.outputs));
-
-            // 如果 outputs 被更新，重新计算并更新 total_tokens
-            updateFields.push(
-                `total_tokens = ${this.adapter.getPlaceholder(paramIndex++)}`,
+            updateData.model_name = extractModelNameFromOutputs(
+                runData.outputs,
             );
-            updateValues.push(extractTotalTokensFromOutputs(runData.outputs));
-
-            // 如果 outputs 被更新，重新计算并更新 model_name
-            updateFields.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(extractModelNameFromOutputs(runData.outputs));
         } else if (runData.total_tokens !== undefined) {
-            updateFields.push(
-                `total_tokens = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(runData.total_tokens);
+            updateData.total_tokens = runData.total_tokens;
         }
 
-        // 如果 runData.model_name 存在且 runData.outputs 未定义（即 outputs 未被更新）
-        // 并且模型名称需要单独更新，则添加 model_name 到更新字段
         if (runData.model_name !== undefined && runData.outputs === undefined) {
-            updateFields.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(runData.model_name);
+            updateData.model_name = runData.model_name;
         }
 
         if (runData.events !== undefined) {
-            updateFields.push(
-                `events = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(JSON.stringify(runData.events));
-            // 如果 events 被更新，重新计算并更新 time_to_first_token
-            updateFields.push(
-                `time_to_first_token = ${this.adapter.getPlaceholder(
-                    paramIndex++,
-                )}`,
-            );
-            updateValues.push(
-                extractTimeToFirstTokenFromEvents(runData.events),
+            updateData.events = JSON.stringify(runData.events);
+            updateData.time_to_first_token = extractTimeToFirstTokenFromEvents(
+                runData.events,
             );
         }
         if (runData.error !== undefined) {
-            updateFields.push(
-                `error = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(JSON.stringify(runData.error));
+            updateData.error = JSON.stringify(runData.error);
         }
         if (runData.extra !== undefined) {
-            updateFields.push(
-                `extra = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(JSON.stringify(runData.extra));
+            updateData.extra = JSON.stringify(runData.extra);
 
-            // 如果更新了 extra 且没有直接提供 thread_id，尝试从 extra 中提取
             if (runData.thread_id === undefined) {
                 const threadId = extractThreadIdFromExtra(runData.extra);
                 if (threadId) {
-                    updateFields.push(
-                        `thread_id = ${this.adapter.getPlaceholder(
-                            paramIndex++,
-                        )}`,
-                    );
-                    updateValues.push(threadId);
+                    updateData.thread_id = threadId;
                 }
             }
 
-            // 从 extra 中提取并更新 user_id
             const userId = extractUserIdFromExtra(runData.extra);
             if (userId) {
-                updateFields.push(
-                    `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
-                );
-                updateValues.push(userId);
+                updateData.user_id = userId;
             }
         }
         if (runData.thread_id !== undefined) {
-            updateFields.push(
-                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(runData.thread_id);
+            updateData.thread_id = runData.thread_id;
         }
         if (runData.serialized !== undefined) {
-            updateFields.push(
-                `serialized = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(JSON.stringify(runData.serialized));
+            updateData.serialized = JSON.stringify(runData.serialized);
         }
         if (runData.total_tokens !== undefined) {
-            updateFields.push(
-                `total_tokens = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(runData.total_tokens);
+            updateData.total_tokens = runData.total_tokens;
         }
         if ((runData as any).tags !== undefined) {
-            updateFields.push(
-                `tags = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            updateValues.push(
-                (runData as any).tags ? (runData as any).tags.join(",") : null,
-            );
+            updateData.tags = (runData as any).tags
+                ? (runData as any).tags.join(",")
+                : null;
         }
 
-        if (updateFields.length === 0) {
+        if (Object.keys(updateData).length === 0) {
             return this.getRun(runId);
         }
 
-        updateFields.push(
-            `updated_at = ${this.adapter.getPlaceholder(paramIndex++)}`,
-        );
-        updateValues.push(now);
-        updateValues.push(runId);
+        updateData.updated_at = now;
 
-        const stmt = await this.adapter.prepare(`
-            UPDATE runs SET ${updateFields.join(
-                ", ",
-            )} WHERE id = ${this.adapter.getPlaceholder(paramIndex)}
-        `);
+        const result = await this.db
+            .updateTable("runs")
+            .set(updateData)
+            .where("id", "=", runId)
+            .executeTakeFirst();
 
-        const result = await stmt.run(updateValues);
-
-        if (result.changes === 0) {
+        if ((result.numUpdatedRows ?? 0n) === 0n) {
             return null;
         }
 
@@ -301,15 +210,14 @@ export class RunRepository {
         const now = new Date().toISOString();
         const jsonValue = json ? JSON.stringify(value) : value;
 
-        const stmt = await this.adapter.prepare(`
-            UPDATE runs SET ${field} = ${this.adapter.getPlaceholder(
-            1,
-        )}, updated_at = ${this.adapter.getPlaceholder(
-            2,
-        )} WHERE id = ${this.adapter.getPlaceholder(3)}
-        `);
-
-        const result = await stmt.run([jsonValue, now, runId]);
+        await this.db
+            .updateTable("runs")
+            .set({
+                [field]: jsonValue,
+                updated_at: now,
+            } as any)
+            .where("id", "=", runId)
+            .execute();
 
         if (field === "outputs") {
             const total_tokens = extractTotalTokensFromOutputs(value);
@@ -340,60 +248,91 @@ export class RunRepository {
             if (user_id)
                 await this.updateRunField(runId, "user_id", user_id, false);
         }
-        if (result.changes === 0) {
-            return null;
-        }
 
         return this.getRun(runId);
     }
 
     // 获取 Run
     async getRun(runId: string): Promise<RunRecord | null> {
-        const stmt = await this.adapter.prepare(
-            `SELECT * FROM runs WHERE id = ${this.adapter.getPlaceholder(1)}`,
-        );
-        const result = (await stmt.get([runId])) as RunRecord;
-        return result || null;
+        const result = await this.db
+            .selectFrom("runs")
+            .selectAll()
+            .where("id", "=", runId)
+            .executeTakeFirst();
+
+        return result
+            ? {
+                  ...result,
+                  trace_id: result.trace_id ?? undefined,
+                  name: result.name || "",
+                  run_type: result.run_type ?? undefined,
+                  system: result.system ?? undefined,
+                  thread_id: result.thread_id ?? undefined,
+                  user_id: result.user_id ?? undefined,
+                  start_time: result.start_time || "",
+                  end_time: result.end_time || "",
+                  inputs: result.inputs ?? undefined,
+                  outputs: result.outputs ?? undefined,
+                  events: result.events ?? undefined,
+                  error: result.error ?? undefined,
+                  extra: result.extra ?? undefined,
+                  serialized: result.serialized ?? undefined,
+                  model_name: result.model_name ?? undefined,
+                  tags: result.tags ?? undefined,
+                  feedback_count: 0,
+                  attachments_count: 0,
+                  feedback: [],
+                  attachments: [],
+              }
+            : null;
     }
 
     // 根据 trace_id 获取 runs
     async getRunsByTraceId(traceId: string): Promise<RunRecord[]> {
-        const stmt = await this.adapter.prepare(
-            `SELECT * FROM runs WHERE trace_id = ${this.adapter.getPlaceholder(
-                1,
-            )} ORDER BY created_at`,
-        );
-        return (await stmt.all([traceId])) as RunRecord[];
+        const results = await this.db
+            .selectFrom("runs")
+            .selectAll()
+            .where("trace_id", "=", traceId)
+            .orderBy("created_at")
+            .execute();
+
+        return results.map((r) => this.mapToRunRecord(r));
     }
 
     // 根据系统获取 runs
     async getRunsBySystem(system: string): Promise<RunRecord[]> {
-        const stmt = await this.adapter.prepare(
-            `SELECT * FROM runs WHERE system = ${this.adapter.getPlaceholder(
-                1,
-            )} ORDER BY created_at DESC`,
-        );
-        return (await stmt.all([system])) as RunRecord[];
+        const results = await this.db
+            .selectFrom("runs")
+            .selectAll()
+            .where("system", "=", system)
+            .orderBy("created_at", "desc")
+            .execute();
+
+        return results.map((r) => this.mapToRunRecord(r));
     }
 
     // 根据线程ID获取 runs
     async getRunsByThreadId(threadId: string): Promise<RunRecord[]> {
-        const stmt = await this.adapter.prepare(
-            `SELECT * FROM runs WHERE thread_id = ${this.adapter.getPlaceholder(
-                1,
-            )} ORDER BY created_at DESC`,
-        );
-        return (await stmt.all([threadId])) as RunRecord[];
+        const results = await this.db
+            .selectFrom("runs")
+            .selectAll()
+            .where("thread_id", "=", threadId)
+            .orderBy("created_at", "desc")
+            .execute();
+
+        return results.map((r) => this.mapToRunRecord(r));
     }
 
     // 根据用户ID获取 runs
     async getRunsByUserId(userId: string): Promise<RunRecord[]> {
-        const stmt = await this.adapter.prepare(
-            `SELECT * FROM runs WHERE user_id = ${this.adapter.getPlaceholder(
-                1,
-            )} ORDER BY created_at DESC`,
-        );
-        return (await stmt.all([userId])) as RunRecord[];
+        const results = await this.db
+            .selectFrom("runs")
+            .selectAll()
+            .where("user_id", "=", userId)
+            .orderBy("created_at", "desc")
+            .execute();
+
+        return results.map((r) => this.mapToRunRecord(r));
     }
 
     // 获取指定 run_type 的 runs，支持分页
@@ -402,26 +341,27 @@ export class RunRepository {
         limit: number,
         offset: number,
     ): Promise<RunRecord[]> {
-        const stmt = await this.adapter.prepare(`
-            SELECT * FROM runs
-            WHERE run_type = ${this.adapter.getPlaceholder(1)}
-            ORDER BY created_at DESC
-            LIMIT ${this.adapter.getPlaceholder(
-                2,
-            )} OFFSET ${this.adapter.getPlaceholder(3)}
-        `);
-        return (await stmt.all([runType, limit, offset])) as RunRecord[];
+        const results = await this.db
+            .selectFrom("runs")
+            .selectAll()
+            .where("run_type", "=", runType)
+            .orderBy("created_at", "desc")
+            .limit(limit)
+            .offset(offset)
+            .execute();
+
+        return results.map((r) => this.mapToRunRecord(r));
     }
 
     // 获取指定 run_type 的总记录数
     async countRunsByRunType(runType: string): Promise<number> {
-        const stmt = await this.adapter.prepare(`
-            SELECT COUNT(*) as count
-            FROM runs
-            WHERE run_type = ${this.adapter.getPlaceholder(1)}
-        `);
-        const result = (await stmt.get([runType])) as { count: number };
-        return result.count || 0;
+        const result = await this.db
+            .selectFrom("runs")
+            .select(({ fn }) => [fn.count<number>("id").as("count")])
+            .where("run_type", "=", runType)
+            .executeTakeFirst();
+
+        return Number(result?.count ?? 0);
     }
 
     // 获取指定条件的 runs，支持分页和多个过滤条件
@@ -439,76 +379,50 @@ export class RunRepository {
         limit: number,
         offset: number,
     ): Promise<RunRecord[]> {
-        const whereConditions: string[] = [];
-        const values: any[] = [];
-        let paramIndex = 1;
+        let query = this.db.selectFrom("runs").selectAll();
 
         if (conditions.run_type) {
-            whereConditions.push(
-                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            values.push(conditions.run_type);
+            query = query.where("run_type", "=", conditions.run_type);
         }
         if (conditions.system) {
-            whereConditions.push(
-                `system = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            values.push(conditions.system);
+            query = query.where("system", "=", conditions.system);
         }
         if (conditions.model_name) {
-            whereConditions.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            values.push(conditions.model_name);
+            query = query.where("model_name", "=", conditions.model_name);
         }
         if (conditions.thread_id) {
-            whereConditions.push(
-                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            values.push(conditions.thread_id);
+            query = query.where("thread_id", "=", conditions.thread_id);
         }
         if (conditions.user_id) {
-            whereConditions.push(
-                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            values.push(conditions.user_id);
+            query = query.where("user_id", "=", conditions.user_id);
         }
         if (conditions.tag) {
-            whereConditions.push(
-                `tags IS NOT NULL AND tags LIKE ${this.adapter.getPlaceholder(
-                    paramIndex++,
-                )}`,
-            );
-            values.push(`%"${conditions.tag}"%`);
+            query = query
+                .where("tags", "is not", null)
+                .where("tags", "like", `%"${conditions.tag}"%`);
         }
         if (conditions.start_time_after) {
-            whereConditions.push(
-                `start_time >= ${this.adapter.getPlaceholder(paramIndex++)}`,
+            query = query.where(
+                "start_time",
+                ">=",
+                new Date(conditions.start_time_after).getTime().toString(),
             );
-            values.push(new Date(conditions.start_time_after).getTime());
         }
         if (conditions.start_time_before) {
-            whereConditions.push(
-                `start_time <= ${this.adapter.getPlaceholder(paramIndex++)}`,
+            query = query.where(
+                "start_time",
+                "<=",
+                new Date(conditions.start_time_before).getTime().toString(),
             );
-            values.push(new Date(conditions.start_time_before).getTime());
         }
 
-        const whereClause =
-            whereConditions.length > 0
-                ? `WHERE ${whereConditions.join(" AND ")}`
-                : "";
+        const results = await query
+            .orderBy("created_at", "desc")
+            .limit(limit)
+            .offset(offset)
+            .execute();
 
-        values.push(limit, offset);
-
-        const stmt = await this.adapter.prepare(`
-            SELECT * FROM runs
-            ${whereClause}
-            ORDER BY created_at DESC
-            LIMIT ${this.adapter.getPlaceholder(paramIndex++)} 
-            OFFSET ${this.adapter.getPlaceholder(paramIndex++)}
-        `);
-        return (await stmt.all(values)) as RunRecord[];
+        return results.map((r) => this.mapToRunRecord(r));
     }
 
     // 获取指定条件的总记录数
@@ -522,108 +436,115 @@ export class RunRepository {
         start_time_after?: string;
         start_time_before?: string;
     }): Promise<number> {
-        const whereConditions: string[] = [];
-        const values: any[] = [];
-        let paramIndex = 1;
+        let query = this.db
+            .selectFrom("runs")
+            .select(({ fn }) => [fn.count<number>("id").as("count")]);
 
-        if (conditions.user_id) {
-            whereConditions.push(
-                `user_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            values.push(conditions.user_id);
-        }
         if (conditions.run_type) {
-            whereConditions.push(
-                `run_type = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            values.push(conditions.run_type);
+            query = query.where("run_type", "=", conditions.run_type);
         }
         if (conditions.system) {
-            whereConditions.push(
-                `system = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            values.push(conditions.system);
+            query = query.where("system", "=", conditions.system);
         }
         if (conditions.model_name) {
-            whereConditions.push(
-                `model_name = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            values.push(conditions.model_name);
+            query = query.where("model_name", "=", conditions.model_name);
         }
         if (conditions.thread_id) {
-            whereConditions.push(
-                `thread_id = ${this.adapter.getPlaceholder(paramIndex++)}`,
-            );
-            values.push(conditions.thread_id);
+            query = query.where("thread_id", "=", conditions.thread_id);
+        }
+        if (conditions.user_id) {
+            query = query.where("user_id", "=", conditions.user_id);
         }
         if (conditions.tag) {
-            whereConditions.push(
-                `tags IS NOT NULL AND tags LIKE ${this.adapter.getPlaceholder(
-                    paramIndex++,
-                )}`,
-            );
-            values.push(`%"${conditions.tag}"%`);
+            query = query
+                .where("tags", "is not", null)
+                .where("tags", "like", `%"${conditions.tag}"%`);
         }
         if (conditions.start_time_after) {
-            whereConditions.push(
-                `start_time >= ${this.adapter.getPlaceholder(paramIndex++)}`,
+            query = query.where(
+                "start_time",
+                ">=",
+                new Date(conditions.start_time_after).getTime().toString(),
             );
-            values.push(new Date(conditions.start_time_after).getTime());
         }
         if (conditions.start_time_before) {
-            whereConditions.push(
-                `start_time <= ${this.adapter.getPlaceholder(paramIndex++)}`,
+            query = query.where(
+                "start_time",
+                "<=",
+                new Date(conditions.start_time_before).getTime().toString(),
             );
-            values.push(new Date(conditions.start_time_before).getTime());
         }
 
-        const whereClause =
-            whereConditions.length > 0
-                ? `WHERE ${whereConditions.join(" AND ")}`
-                : "";
-
-        const stmt = await this.adapter.prepare(`
-            SELECT COUNT(*) as count
-            FROM runs
-            ${whereClause}
-        `);
-        const result = (await stmt.get(values)) as { count: number };
-        return result.count || 0;
+        const result = await query.executeTakeFirst();
+        return Number(result?.count ?? 0);
     }
 
     // 获取所有线程ID列表
     async getAllThreadIds(): Promise<string[]> {
-        const stmt = await this.adapter.prepare(`
-            SELECT DISTINCT thread_id 
-            FROM runs 
-            WHERE thread_id IS NOT NULL AND thread_id != ''
-            ORDER BY thread_id
-        `);
-        const results = (await stmt.all()) as { thread_id: string }[];
-        return results.map((r) => r.thread_id);
+        const results = await this.db
+            .selectFrom("runs")
+            .select("thread_id")
+            .distinct()
+            .where("thread_id", "is not", null)
+            .where("thread_id", "!=", "")
+            .orderBy("thread_id")
+            .execute();
+
+        return results.map((r) => r.thread_id!);
     }
 
     // 获取所有用户ID列表
     async getAllUserIds(): Promise<string[]> {
-        const stmt = await this.adapter.prepare(`
-            SELECT DISTINCT user_id 
-            FROM runs 
-            WHERE user_id IS NOT NULL AND user_id != ''
-            ORDER BY user_id
-        `);
-        const results = (await stmt.all()) as { user_id: string }[];
-        return results.map((r) => r.user_id);
+        const results = await this.db
+            .selectFrom("runs")
+            .select("user_id")
+            .distinct()
+            .where("user_id", "is not", null)
+            .where("user_id", "!=", "")
+            .orderBy("user_id")
+            .execute();
+
+        return results.map((r) => r.user_id!);
     }
 
     // 获取所有模型名称列表
     async getAllModelNames(): Promise<string[]> {
-        const stmt = await this.adapter.prepare(`
-            SELECT DISTINCT model_name 
-            FROM runs 
-            WHERE model_name IS NOT NULL AND model_name != ''
-            ORDER BY model_name
-        `);
-        const results = (await stmt.all()) as { model_name: string }[];
-        return results.map((r) => r.model_name);
+        const results = await this.db
+            .selectFrom("runs")
+            .select("model_name")
+            .distinct()
+            .where("model_name", "is not", null)
+            .where("model_name", "!=", "")
+            .orderBy("model_name")
+            .execute();
+
+        return results.map((r) => r.model_name!);
+    }
+
+    // 辅助方法：将数据库记录映射为 RunRecord
+    private mapToRunRecord(r: any): RunRecord {
+        return {
+            ...r,
+            trace_id: r.trace_id ?? undefined,
+            name: r.name ?? undefined,
+            run_type: r.run_type ?? undefined,
+            system: r.system ?? undefined,
+            thread_id: r.thread_id ?? undefined,
+            user_id: r.user_id ?? undefined,
+            start_time: r.start_time ?? undefined,
+            end_time: r.end_time ?? undefined,
+            inputs: r.inputs ?? undefined,
+            outputs: r.outputs ?? undefined,
+            events: r.events ?? undefined,
+            error: r.error ?? undefined,
+            extra: r.extra ?? undefined,
+            serialized: r.serialized ?? undefined,
+            model_name: r.model_name ?? undefined,
+            tags: r.tags ?? undefined,
+            feedback_count: 0,
+            attachments_count: 0,
+            feedback: [],
+            attachments: [],
+        };
     }
 }

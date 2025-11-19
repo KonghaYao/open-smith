@@ -1,4 +1,5 @@
-import type { DatabaseAdapter } from "./interfaces.js";
+import type { Kysely } from "kysely";
+import type { Database } from "./schema.js";
 import { BaseDatabase } from "./base-database.js";
 import { SystemRepository } from "./repositories/system-repository.js";
 import { RunRepository } from "./repositories/run-repository.js";
@@ -14,7 +15,6 @@ import type {
     RunRecord,
     FeedbackRecord,
     AttachmentRecord,
-    RunStatsHourlyRecord,
 } from "../types.js";
 
 export class TraceDatabase extends BaseDatabase {
@@ -25,21 +25,21 @@ export class TraceDatabase extends BaseDatabase {
     readonly traceRepo: TraceRepository;
     readonly runStatsRepo: RunStatsRepository;
 
-    constructor(adapter: DatabaseAdapter) {
-        super(adapter);
-        this.systemRepo = new SystemRepository(adapter);
-        this.runRepo = new RunRepository(adapter);
-        this.feedbackRepo = new FeedbackRepository(adapter);
-        this.attachmentRepo = new AttachmentRepository(adapter);
-        this.traceRepo = new TraceRepository(adapter);
-        this.runStatsRepo = new RunStatsRepository(adapter);
+    constructor(db: Kysely<Database>) {
+        super(db);
+        this.systemRepo = new SystemRepository(db);
+        this.runRepo = new RunRepository(db);
+        this.feedbackRepo = new FeedbackRepository(db);
+        this.attachmentRepo = new AttachmentRepository(db);
+        this.traceRepo = new TraceRepository(db);
+        this.runStatsRepo = new RunStatsRepository(db);
     }
 
     // System 相关方法
     async createSystem(
         name: string,
         description?: string,
-        apiKey?: string
+        apiKey?: string,
     ): Promise<SystemRecord> {
         return this.systemRepo.createSystem(name, description, apiKey);
     }
@@ -66,7 +66,7 @@ export class TraceDatabase extends BaseDatabase {
 
     async updateSystemStatus(
         id: string,
-        status: "active" | "inactive"
+        status: "active" | "inactive",
     ): Promise<SystemRecord | null> {
         return this.systemRepo.updateSystemStatus(id, status);
     }
@@ -77,7 +77,7 @@ export class TraceDatabase extends BaseDatabase {
             name?: string;
             description?: string;
             status?: "active" | "inactive";
-        }
+        },
     ): Promise<SystemRecord | null> {
         return this.systemRepo.updateSystem(id, updates);
     }
@@ -132,7 +132,7 @@ export class TraceDatabase extends BaseDatabase {
 
     async updateRun(
         runId: string,
-        runData: RunPayload
+        runData: RunPayload,
     ): Promise<RunRecord | null> {
         return this.runRepo.updateRun(runId, runData);
     }
@@ -141,7 +141,7 @@ export class TraceDatabase extends BaseDatabase {
         runId: string,
         field: string,
         value: any,
-        json = true
+        json = true,
     ): Promise<RunRecord | null> {
         return this.runRepo.updateRunField(runId, field, value, json);
     }
@@ -169,7 +169,7 @@ export class TraceDatabase extends BaseDatabase {
     async getRunsByRunType(
         runType: string,
         limit: number,
-        offset: number
+        offset: number,
     ): Promise<RunRecord[]> {
         return this.runRepo.getRunsByRunType(runType, limit, offset);
     }
@@ -186,11 +186,11 @@ export class TraceDatabase extends BaseDatabase {
             thread_id?: string;
             user_id?: string;
             tag?: string;
-            start_time_after?: string; // 新增
-            start_time_before?: string; // 新增
+            start_time_after?: string;
+            start_time_before?: string;
         },
         limit: number,
-        offset: number
+        offset: number,
     ): Promise<RunRecord[]> {
         return this.runRepo.getRunsByConditions(conditions, limit, offset);
     }
@@ -202,8 +202,8 @@ export class TraceDatabase extends BaseDatabase {
         thread_id?: string;
         user_id?: string;
         tag?: string;
-        start_time_after?: string; // 新增
-        start_time_before?: string; // 新增
+        start_time_after?: string;
+        start_time_before?: string;
     }): Promise<number> {
         return this.runRepo.countRunsByConditions(conditions);
     }
@@ -223,7 +223,7 @@ export class TraceDatabase extends BaseDatabase {
     // Feedback 相关方法
     async createFeedback(
         runId: string,
-        feedbackData: FeedbackPayload
+        feedbackData: FeedbackPayload,
     ): Promise<FeedbackRecord> {
         return this.feedbackRepo.createFeedback(runId, feedbackData);
     }
@@ -238,14 +238,14 @@ export class TraceDatabase extends BaseDatabase {
         filename: string,
         contentType: string,
         fileSize: number,
-        storagePath: string
+        storagePath: string,
     ): Promise<AttachmentRecord> {
         return this.attachmentRepo.createAttachment(
             runId,
             filename,
             contentType,
             fileSize,
-            storagePath
+            storagePath,
         );
     }
 
@@ -276,7 +276,7 @@ export class TraceDatabase extends BaseDatabase {
             thread_id?: string;
         },
         limit?: number,
-        offset?: number
+        offset?: number,
     ): Promise<Array<TraceOverview>> {
         return this.traceRepo.getThreadOverviews(filters, limit, offset);
     }
@@ -290,7 +290,7 @@ export class TraceDatabase extends BaseDatabase {
             model_name?: string;
         },
         limit: number,
-        offset: number
+        offset: number,
     ): Promise<TraceOverview[]> {
         return this.traceRepo.getTracesByConditions(conditions, limit, offset);
     }
@@ -307,7 +307,6 @@ export class TraceDatabase extends BaseDatabase {
 }
 
 // 导出相关类型和接口
-export type { DatabaseAdapter, PreparedStatement } from "./interfaces.js";
 export { BaseDatabase } from "./base-database.js";
 export { SystemRepository } from "./repositories/system-repository.js";
 export { RunRepository } from "./repositories/run-repository.js";
@@ -315,3 +314,8 @@ export { FeedbackRepository } from "./repositories/feedback-repository.js";
 export { AttachmentRepository } from "./repositories/attachment-repository.js";
 export { TraceRepository } from "./repositories/trace-repository.js";
 export { RunStatsRepository } from "./repositories/run-stats-repository.js";
+
+// 导出 Kysely 相关
+export type { Database } from "./schema.js";
+export type { Kysely } from "kysely";
+export * from "./kysely-dialects.js";

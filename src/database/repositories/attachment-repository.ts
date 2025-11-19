@@ -1,9 +1,10 @@
 import { v4 as uuidv4 } from "uuid";
-import type { DatabaseAdapter } from "../interfaces.js";
+import type { Kysely } from "kysely";
+import type { Database } from "../schema.js";
 import type { AttachmentRecord } from "../../types.js";
 
 export class AttachmentRepository {
-    constructor(private adapter: DatabaseAdapter) {}
+    constructor(private db: Kysely<Database>) {}
 
     // 创建附件
     async createAttachment(
@@ -11,7 +12,7 @@ export class AttachmentRepository {
         filename: string,
         contentType: string,
         fileSize: number,
-        storagePath: string
+        storagePath: string,
     ): Promise<AttachmentRecord> {
         const id = uuidv4();
         const now = new Date().toISOString();
@@ -26,40 +27,36 @@ export class AttachmentRepository {
             created_at: now,
         };
 
-        const stmt = await this.adapter.prepare(`
-            INSERT INTO attachments (
-                id, run_id, filename, content_type, file_size, storage_path, created_at
-            ) VALUES (${this.adapter.getPlaceholder(
-                1
-            )}, ${this.adapter.getPlaceholder(
-            2
-        )}, ${this.adapter.getPlaceholder(3)}, ${this.adapter.getPlaceholder(
-            4
-        )}, ${this.adapter.getPlaceholder(5)}, ${this.adapter.getPlaceholder(
-            6
-        )}, ${this.adapter.getPlaceholder(7)})
-        `);
-
-        await stmt.run([
-            record.id,
-            record.run_id,
-            record.filename,
-            record.content_type,
-            record.file_size,
-            record.storage_path,
-            record.created_at,
-        ]);
+        await this.db
+            .insertInto("attachments")
+            .values({
+                id: record.id,
+                run_id: record.run_id,
+                filename: record.filename,
+                content_type: record.content_type ?? null,
+                file_size: record.file_size ?? null,
+                storage_path: record.storage_path ?? null,
+                created_at: record.created_at,
+            })
+            .execute();
 
         return record;
     }
 
     // 根据 run_id 获取附件
     async getAttachmentsByRunId(runId: string): Promise<AttachmentRecord[]> {
-        const stmt = await this.adapter.prepare(
-            `SELECT * FROM attachments WHERE run_id = ${this.adapter.getPlaceholder(
-                1
-            )} ORDER BY created_at`
-        );
-        return (await stmt.all([runId])) as AttachmentRecord[];
+        const results = await this.db
+            .selectFrom("attachments")
+            .selectAll()
+            .where("run_id", "=", runId)
+            .orderBy("created_at")
+            .execute();
+
+        return results.map((r) => ({
+            ...r,
+            content_type: r.content_type ?? "",
+            file_size: r.file_size ?? 0,
+            storage_path: r.storage_path ?? "",
+        }));
     }
 }

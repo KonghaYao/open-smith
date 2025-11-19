@@ -11,7 +11,6 @@ import { ofetch } from "../api.js";
 import type { RunStatsHourlyRecord } from "../../src/types.js";
 import { Table, type TableColumn } from "../components/Table.js";
 import { Chart } from "../components/Chart.js";
-import type { ChartConfiguration } from "chart.js";
 import { A } from "@solidjs/router";
 
 const threeDaysAgo = (): Date => {

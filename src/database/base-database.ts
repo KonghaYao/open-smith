@@ -1,10 +1,12 @@
-import type { DatabaseAdapter } from "./interfaces.js";
+import type { Kysely } from "kysely";
+import type { Database } from "./schema.js";
+import { sql } from "kysely";
 
 export class BaseDatabase {
-    protected adapter: DatabaseAdapter;
+    protected db: Kysely<Database>;
 
-    constructor(adapter: DatabaseAdapter) {
-        this.adapter = adapter;
+    constructor(db: Kysely<Database>) {
+        this.db = db;
     }
 
     // 初始化方法，需要在使用数据库前调用
@@ -15,7 +17,7 @@ export class BaseDatabase {
     // 初始化数据库表结构
     private async initTables(): Promise<void> {
         // 创建 systems 表
-        await this.adapter.exec(`
+        await sql`
             CREATE TABLE IF NOT EXISTS systems (
                 id TEXT PRIMARY KEY,
                 name TEXT UNIQUE NOT NULL,
@@ -25,10 +27,10 @@ export class BaseDatabase {
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
-        `);
+        `.execute(this.db);
 
         // 创建 runs 表
-        await this.adapter.exec(`
+        await sql`
             CREATE TABLE IF NOT EXISTS runs (
                 id TEXT PRIMARY KEY,
                 trace_id TEXT,
@@ -53,10 +55,10 @@ export class BaseDatabase {
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY (system) REFERENCES systems (name)
             )
-        `);
+        `.execute(this.db);
 
         // 创建 feedback 表
-        await this.adapter.exec(`
+        await sql`
             CREATE TABLE IF NOT EXISTS feedback (
                 id TEXT PRIMARY KEY,
                 trace_id TEXT NOT NULL,
@@ -68,10 +70,10 @@ export class BaseDatabase {
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (run_id) REFERENCES runs (id)
             )
-        `);
+        `.execute(this.db);
 
         // 创建 attachments 表
-        await this.adapter.exec(`
+        await sql`
             CREATE TABLE IF NOT EXISTS attachments (
                 id TEXT PRIMARY KEY,
                 run_id TEXT NOT NULL,
@@ -82,26 +84,48 @@ export class BaseDatabase {
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (run_id) REFERENCES runs (id)
             )
-        `);
+        `.execute(this.db);
 
         // 创建索引
-        await this.adapter.exec(`
-            CREATE INDEX IF NOT EXISTS idx_systems_name ON systems (name);
-            CREATE INDEX IF NOT EXISTS idx_systems_api_key ON systems (api_key);
-            CREATE INDEX IF NOT EXISTS idx_systems_status ON systems (status);
-            CREATE INDEX IF NOT EXISTS idx_runs_trace_id ON runs (trace_id);
-            CREATE INDEX IF NOT EXISTS idx_runs_thread_id ON runs (thread_id);
-            CREATE INDEX IF NOT EXISTS idx_runs_user_id ON runs (user_id);
-            CREATE INDEX IF NOT EXISTS idx_runs_model_name ON runs (model_name);
-            CREATE INDEX IF NOT EXISTS idx_runs_system ON runs (system);
-            CREATE INDEX IF NOT EXISTS idx_runs_run_type ON runs (run_type);
-            CREATE INDEX IF NOT EXISTS idx_feedback_trace_id ON feedback (trace_id);
-            CREATE INDEX IF NOT EXISTS idx_feedback_run_id ON feedback (run_id);
-            CREATE INDEX IF NOT EXISTS idx_attachments_run_id ON attachments (run_id);
-        `);
+        await sql`CREATE INDEX IF NOT EXISTS idx_systems_name ON systems (name)`.execute(
+            this.db,
+        );
+        await sql`CREATE INDEX IF NOT EXISTS idx_systems_api_key ON systems (api_key)`.execute(
+            this.db,
+        );
+        await sql`CREATE INDEX IF NOT EXISTS idx_systems_status ON systems (status)`.execute(
+            this.db,
+        );
+        await sql`CREATE INDEX IF NOT EXISTS idx_runs_trace_id ON runs (trace_id)`.execute(
+            this.db,
+        );
+        await sql`CREATE INDEX IF NOT EXISTS idx_runs_thread_id ON runs (thread_id)`.execute(
+            this.db,
+        );
+        await sql`CREATE INDEX IF NOT EXISTS idx_runs_user_id ON runs (user_id)`.execute(
+            this.db,
+        );
+        await sql`CREATE INDEX IF NOT EXISTS idx_runs_model_name ON runs (model_name)`.execute(
+            this.db,
+        );
+        await sql`CREATE INDEX IF NOT EXISTS idx_runs_system ON runs (system)`.execute(
+            this.db,
+        );
+        await sql`CREATE INDEX IF NOT EXISTS idx_runs_run_type ON runs (run_type)`.execute(
+            this.db,
+        );
+        await sql`CREATE INDEX IF NOT EXISTS idx_feedback_trace_id ON feedback (trace_id)`.execute(
+            this.db,
+        );
+        await sql`CREATE INDEX IF NOT EXISTS idx_feedback_run_id ON feedback (run_id)`.execute(
+            this.db,
+        );
+        await sql`CREATE INDEX IF NOT EXISTS idx_attachments_run_id ON attachments (run_id)`.execute(
+            this.db,
+        );
 
         // 创建 run_stats_hourly 表
-        await this.adapter.exec(`
+        await sql`
             CREATE TABLE IF NOT EXISTS run_stats_hourly (
                 stat_hour TEXT NOT NULL,
                 model_name TEXT,
@@ -121,21 +145,14 @@ export class BaseDatabase {
                 distinct_users INTEGER,
                 PRIMARY KEY (stat_hour, model_name, system)
             )
-        `);
+        `.execute(this.db);
 
-        await this.adapter.exec(`
-            CREATE INDEX IF NOT EXISTS idx_run_stats_hourly_time ON run_stats_hourly (stat_hour);
-        `);
-    }
-
-    // 事务操作
-    async createTransaction<T extends any[], R>(
-        fn: (...args: T) => Promise<R>
-    ): Promise<(...args: T) => Promise<R>> {
-        return await this.adapter.transaction(fn);
+        await sql`CREATE INDEX IF NOT EXISTS idx_run_stats_hourly_time ON run_stats_hourly (stat_hour)`.execute(
+            this.db,
+        );
     }
 
     async close(): Promise<void> {
-        return await this.adapter.close();
+        return await this.db.destroy();
     }
 }
