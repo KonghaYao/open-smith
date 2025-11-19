@@ -18,7 +18,7 @@ const contentSchema = z.union([
             type: z.string(),
             text: z.string().optional(),
             image_url: z.object({ url: z.string() }).optional(),
-        })
+        }),
     ),
 ]);
 // 更新 messageTemplateSchema 以支持 Template 接口和数组 content
@@ -47,18 +47,18 @@ export type ModelConfig = z.infer<typeof modelSchema>;
 
 const playgroundSchema = z.object({
     messages: z.array(messageTemplateSchema),
-    inputs: z.record(z.any()).optional().default({}),
+    inputs: z.any().optional().default({}),
     model: modelSchema,
     tools: z
         .array(
             z.object({
                 name: z.string(),
                 description: z.string(),
-                schema: z.record(z.any()), // JSON Schema 对象
-            })
+                schema: z.any(), // JSON Schema 对象
+            }),
         )
         .optional(),
-    output_schema: z.record(z.any()).optional(), // JSON Schema 对象
+    output_schema: z.any().optional(), // JSON Schema 对象
 });
 
 async function createChain(body: any) {
@@ -71,7 +71,7 @@ async function createChain(body: any) {
         Object.entries(modelParams).map(([key, value]) => [
             key.replace(/_([a-z])/g, (g) => g[1].toUpperCase()),
             value,
-        ])
+        ]),
     );
 
     let chat = new ChatOpenAI({
@@ -99,8 +99,8 @@ async function createChain(body: any) {
                     name: i.name,
                     description: i.description,
                     schema: i.schema, // i.schema 已经是 JSON Schema 格式
-                })
-            )
+                }),
+            ),
         );
     }
 
@@ -121,7 +121,7 @@ llmRouter.post("/invoke", async (c) => {
         return c.json(result as any);
     } catch (error) {
         if (error instanceof z.ZodError) {
-            return c.json({ errors: error.errors }, 400);
+            return c.json({ errors: error.message }, 400);
         }
         console.error(error);
         return c.json({ error: "An unexpected error occurred." }, 500);
@@ -147,7 +147,7 @@ llmRouter.post("/stream", async (c) => {
                         for await (const chunk of stream) {
                             const data = JSON.stringify(chunk);
                             controller.enqueue(
-                                encoder.encode(`data: ${data}\n\n`)
+                                encoder.encode(`data: ${data}\n\n`),
                             );
                         }
                         controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
@@ -157,7 +157,7 @@ llmRouter.post("/stream", async (c) => {
                             error: "Stream error occurred",
                         });
                         controller.enqueue(
-                            encoder.encode(`data: ${errorData}\n\n`)
+                            encoder.encode(`data: ${errorData}\n\n`),
                         );
                     } finally {
                         controller.close();
@@ -172,11 +172,11 @@ llmRouter.post("/stream", async (c) => {
                     "Access-Control-Allow-Origin": "*",
                     "Access-Control-Allow-Headers": "Content-Type",
                 },
-            }
+            },
         );
     } catch (error) {
         if (error instanceof z.ZodError) {
-            return c.json({ errors: error.errors }, 400);
+            return c.json({ errors: error.message }, 400);
         }
         console.error(error);
         return c.json({ error: "An unexpected error occurred." }, 500);
