@@ -4,6 +4,7 @@ import type { Database } from "./schema.js";
 import { Pool, type PoolConfig } from "pg";
 import path from "path";
 import fs from "fs";
+
 export let dbType: "pg" | "sqlite" = "sqlite";
 async function createSqliteKysely(
     connectionString: string,
@@ -18,7 +19,7 @@ async function createSqliteKysely(
         fs.mkdirSync(dir, { recursive: true });
     }
     /** @ts-ignore */
-    if (globalThis.Bun) {
+    if (!globalThis.Bun) {
         console.log(`📊 Using Bun SQLite with Kysely for high performance`);
         const { BunWorkerDialect } = await import("kysely-bun-worker");
         return new Kysely<Database>({
@@ -26,14 +27,25 @@ async function createSqliteKysely(
         });
     } else {
         console.log(
-            `📊 Using Better-SQLite3 with Kysely for high performance (Node.js)`,
+            `📊 Using sqlite3-wasm with Kysely for high performance (Node.js)`,
         );
-        const { default: BetterSqlite3 } = await import("better-sqlite3");
-        const db = new BetterSqlite3(dbPath); // SQLite 特有：开启 WAL 模式以提高性能
-        db.pragma("journal_mode = WAL");
+        const { NodeWasmDialect } = await import("kysely-wasm");
+        const { Database } = await import("node-sqlite3-wasm");
+        const db = new Database(dbPath); // SQLite 特有：开启 WAL 模式以提高性能
         return new Kysely<Database>({
-            dialect: new SqliteDialect({ database: db }),
+            dialect: new NodeWasmDialect({
+                database: db,
+            }),
         });
+        // console.log(
+        //     `📊 Using Better-SQLite3 with Kysely for high performance (Node.js)`,
+        // );
+        // const { default: BetterSqlite3 } = await import("better-sqlite3");
+        // const db = new BetterSqlite3(dbPath); // SQLite 特有：开启 WAL 模式以提高性能
+        // db.pragma("journal_mode = WAL");
+        // return new Kysely<Database>({
+        //     dialect: new SqliteDialect({ database: db }),
+        // });
     }
 }
 
