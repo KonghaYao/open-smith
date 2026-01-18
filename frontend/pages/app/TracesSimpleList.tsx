@@ -29,11 +29,10 @@ export const TracesSimpleList = (props: {
                         .map((trace, index) => {
                             const isSelected =
                                 props.selectedTraceId() === trace.trace_id;
-                            const panelCard = `trace-item card-hover py-1 px-2 m-2  bg-white border-2  rounded-lg cursor-pointer ${
-                                isSelected
-                                    ? "border-blue-500"
-                                    : "border-gray-200"
-                            }`;
+                            const panelCard = `trace-item card-hover py-1 px-2 m-2  bg-white border-2  rounded-lg cursor-pointer ${isSelected
+                                ? "border-blue-500"
+                                : "border-gray-200"
+                                }`;
                             return (
                                 <div
                                     onClick={() =>
@@ -59,9 +58,9 @@ export const TracesSimpleList = (props: {
                                                 new Date(
                                                     trace.last_run_time
                                                 ).getTime() -
-                                                    new Date(
-                                                        trace.first_run_time
-                                                    ).getTime()
+                                                new Date(
+                                                    trace.first_run_time
+                                                ).getTime()
                                             )}
                                         </span>
                                         <span
@@ -72,7 +71,7 @@ export const TracesSimpleList = (props: {
                                     </div>
                                 </div>
                             );
-                        })}
+                        }).reverse()}
                 </div>
             )}
         </div>

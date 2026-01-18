@@ -12,9 +12,8 @@ export const RunItem = (props: {
         props.onSelect(props.run.id);
     };
     const cardClass = () => {
-        return `bg-white  rounded-lg cursor-pointer   ${
-            props.isSelected() ? "ring-2 ring-blue-500 " : ""
-        }`;
+        return `bg-white  rounded-lg cursor-pointer   ${props.isSelected() ? "ring-2 ring-blue-500 " : ""
+            }`;
     };
     const metadata = createMemo(() => getMetaDataOfRun(props.run));
 
@@ -36,21 +35,19 @@ export const RunItem = (props: {
             <div
                 class="flex mb-2 flex-wrap"
                 style={{
-                    "padding-left": `${
-                        calcLevelFromCheckpointNs(
-                            props.run.name,
-                            metadata(),
-                            getRunType(props.run)
-                        ) * 20
-                    }px`,
+                    "padding-left": `${calcLevelFromCheckpointNs(
+                        props.run.name,
+                        metadata(),
+                        getRunType(props.run)
+                    ) * 20
+                        }px`,
                 }}>
                 <div class="text-gray-400 text-left">
                     {(icon[getRunType(props.run)] ?? icon.unknown)()}
                 </div>
                 <div
-                    class={`px-2 font-medium ${
-                        props.run.error ? "text-red-500" : "text-gray-900"
-                    }`}>
+                    class={`px-2 font-medium ${props.run.error ? "text-red-500" : "text-gray-900"
+                        }`}>
                     {props.run.name}
                 </div>
                 <div class="flex space-x-2 flex-wrap">
@@ -106,7 +103,7 @@ const calcLevelFromCheckpointNs = (
         if (type === "RunnableSequence")
             return name === "RunnableSequence" ? 1 : 0;
         if (type === "ChannelWrite") return 2;
-        if (type === "ChatOpenAI") return 3;
+        if (type.startsWith("Chat")) return 3;
         if (type === "RunnableLambda") return 3;
         if (type === "RunnableCallable") return 3;
         if (type === "DynamicStructuredTool") return 3;

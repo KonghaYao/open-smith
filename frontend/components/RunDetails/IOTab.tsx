@@ -29,7 +29,7 @@ export const IOTab = (props: { run: RunRecord }) => {
             <ToolsSection tools={tools} />
             <OutputsSection run={props.run} outputs={outputs} />
             <InputsSection inputs={inputs} />
-            {props.run.attachments_count > 0 && (
+            {props.run?.attachments_count > 0 && (
                 <AttachmentsSection attachments={props.run.attachments} />
             )}
         </div>
@@ -46,28 +46,32 @@ const ToolsSection = (props: { tools: any }) => {
                     </h4>
                     <div class="bg-gray-50 rounded-lg p-4">
                         {props.tools().map((tool: any) => {
+                            const name = tool?.name ?? tool?.function?.name
                             const [schema] = createResource(async () => {
+                                console.log(tool);
                                 try {
                                     const schema = await compile(
-                                        tool?.function?.parameters,
-                                        "Demo"
+                                        tool?.function?.parameters || tool?.input_schema,
+                                        name
                                     );
                                     return schema;
                                 } catch (e) {
                                     return "";
                                 }
                             });
-                            const prefix = `/**\n * ${tool.function.description}\n */\n`;
+                            const prefix = tool?.description ?? tool?.function?.description;
                             return (
                                 <details>
                                     <summary class="border mb-2 bg-white shadow-sm cursor-pointer rounded-lg">
                                         <div class="px-4 py-2 font-medium text-gray-700 bg-gray-100 rounded-t">
-                                            {tool.function.name}
+                                            {name}
                                         </div>
                                     </summary>
-
+                                    <div class="bg-gray-100 text-gray-600 text-sm px-2">
+                                        {prefix}
+                                    </div>
                                     <pre class="text-sm p-4 whitespace-pre-wrap">
-                                        <code>{prefix + schema()}</code>
+                                        <code>{schema()}</code>
                                     </pre>
                                 </details>
                             );
@@ -98,25 +102,26 @@ const OutputsSection = (props: { run: RunRecord; outputs: any }) => {
             </h4>
             {props.run.error
                 ? (() => {
-                      let error = props.run.error as string;
-                      try {
-                          error = JSON.parse(error);
-                      } catch (e) {}
-                      return (
-                          <div class="overflow-x-hidden">
-                              <p class="text-red-500 text-sm whitespace-pre-wrap break-all">
-                                  {error}
-                              </p>
-                          </div>
-                      );
-                  })()
+                    let error = props.run.error as string;
+                    try {
+                        error = JSON.parse(error);
+                    } catch (e) { }
+                    return (
+                        <div class="overflow-x-hidden">
+                            <p class="text-red-500 text-sm whitespace-pre-wrap break-all">
+                                {error}
+                            </p>
+                        </div>
+                    );
+                })()
                 : ""}
             <div class="bg-gray-50 rounded-lg p-4">
-                {props.outputs() ? (
+                {/* 这个太长先不显示 */}
+                {/* {props.outputs() ? (
                     <GraphStatePanel state={props.outputs()} />
                 ) : (
                     <div class="text-gray-500 text-sm">无输出数据</div>
-                )}
+                )} */}
                 {props.run.run_type === "tool" ? (
                     <pre class="text-gray-500 text-sm">
                         {props.outputs().output?.kwargs?.content}
