@@ -66,10 +66,10 @@ const ToolsSection = (props: { tools: any }) => {
                                             {name}
                                         </div>
                                     </summary>
-                                    <div class="bg-gray-100 text-gray-600 text-sm px-2">
+                                    <pre class="bg-gray-100 text-gray-600 text-sm px-2">
                                         {prefix}
-                                    </div>
-                                    <pre class="text-sm p-4 whitespace-pre-wrap">
+                                    </pre>
+                                    <pre class="text-xs p-4 whitespace-pre-wrap">
                                         <code>{schema()}</code>
                                     </pre>
                                 </details>

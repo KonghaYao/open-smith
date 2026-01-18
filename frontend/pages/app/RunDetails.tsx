@@ -41,7 +41,7 @@ export const RunDetails = (props: RunDetailsProps) => {
         return parseJSON(run.extra);
     });
     const modelName = createMemo(() => {
-        return extraData().metadata.ls_model_name
+        return extraData()?.metadata?.ls_model_name
     })
 
     return (
