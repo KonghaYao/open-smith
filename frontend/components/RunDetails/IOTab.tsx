@@ -48,7 +48,6 @@ const ToolsSection = (props: { tools: any }) => {
                         {props.tools().map((tool: any) => {
                             const name = tool?.name ?? tool?.function?.name
                             const [schema] = createResource(async () => {
-                                console.log(tool);
                                 try {
                                     const schema = await compile(
                                         tool?.function?.parameters || tool?.input_schema,

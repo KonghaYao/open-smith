@@ -26,7 +26,8 @@ export const RunItem = (props: {
         return props.run.total_tokens;
     });
     const modelName = createMemo(() => {
-        return props.run.model_name;
+
+        return props.run.model_name || metadata().ls_model_name;
     });
     // 改为 tsx 语法
 
@@ -52,21 +53,21 @@ export const RunItem = (props: {
                 </div>
                 <div class="flex space-x-2 flex-wrap">
                     {time() ? (
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-xs font-medium">
                             ⏱️ {time().toFixed(1)}s
                         </span>
                     ) : null}
                     {!!tokens() ? (
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-green-50 text-green-600 text-xs font-medium">
                             🔢 {tokens()} tokens
                         </span>
                     ) : null}
                     {modelName() ? (
                         <div class="flex items-center space-x-2 text-xs text-gray-500">
-                            <span class="font-mono bg-gray-100 px-1.5 py-0.5 rounded">
+                            <span class="font-mono bg-gray-50 px-1.5 py-0.5 rounded">
                                 {modelName()}
                             </span>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 font-medium">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-600 font-medium">
                                 {calcTpsFromRun(props.run).toFixed(0)} tps
                             </span>
                         </div>

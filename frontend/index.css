@@ -190,6 +190,9 @@ code {
     font-family: "FontWithASyntaxHighlighter", monospace;
     font-palette: --CodePalette;
 }
+pre{
+    white-space: break-spaces;
+}
 
 /* 隐去 summary 的三角 */
 summary {

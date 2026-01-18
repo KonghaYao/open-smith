@@ -40,6 +40,9 @@ export const RunDetails = (props: RunDetailsProps) => {
         if (!run || !run.extra) return null;
         return parseJSON(run.extra);
     });
+    const modelName = createMemo(() => {
+        return extraData().metadata.ls_model_name
+    })
 
     return (
         <div class="flex-1 border-l border-gray-200 bg-white flex flex-col h-screen">
@@ -74,16 +77,23 @@ export const RunDetails = (props: RunDetailsProps) => {
                             <span>Type: {getRunType(selectedRunData())}</span>
                             <span class="flex items-center">
                                 <div
-                                    class={`w-2 h-2 rounded-full ${
-                                        selectedRunData()?.error
-                                            ? "bg-red-500"
-                                            : "bg-green-500"
-                                    } mr-1`}></div>
+                                    class={`w-2 h-2 rounded-full ${selectedRunData()?.error
+                                        ? "bg-red-500"
+                                        : "bg-green-500"
+                                        } mr-1`}></div>
                                 {selectedRunData()?.error ? "失败" : "成功"}
                             </span>
                             <span>
                                 {formatDateTime(selectedRunData()?.created_at!)}
                             </span>
+                            {
+                                modelName() &&
+                                <span>
+                                    Model: {modelName()}
+
+
+                                </span>
+                            }
                         </div>
                     </div>
                 ) : (
@@ -107,11 +117,10 @@ export const RunDetails = (props: RunDetailsProps) => {
             {/* Tab 导航 */}
             {(() => {
                 const selectedClass = (tab: string) => {
-                    return `px-4 py-2 text-sm font-medium border-b-2 ${
-                        activeTab() === tab
-                            ? "text-blue-600 border-blue-600"
-                            : "text-gray-600 hover:text-gray-900 border-transparent"
-                    }`;
+                    return `px-4 py-2 text-sm font-medium border-b-2 ${activeTab() === tab
+                        ? "text-blue-600 border-blue-600"
+                        : "text-gray-600 hover:text-gray-900 border-transparent"
+                        }`;
                 };
                 return props.selectedRunId() && selectedRunData() ? (
                     <div class="flex border-b border-gray-200 bg-gray-50">
