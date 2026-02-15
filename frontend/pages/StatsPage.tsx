@@ -1,5 +1,3 @@
-/// <reference types="solid-js/jsx-runtime" />
-
 import {
     createSignal,
     createResource,
@@ -7,15 +5,17 @@ import {
     type JSX,
     createMemo,
 } from "solid-js";
-import { ofetch } from "../api.js";
-import type { RunStatsHourlyRecord } from "../../src/types.js";
-import { Table, type TableColumn } from "../components/Table.js";
-import { Chart } from "../components/Chart.js";
-import { A } from "@solidjs/router";
+import {
+    getTimeseries,
+    type TimeseriesQuery,
+    type TimeseriesResponse,
+} from "../api";
+import { Chart as ChartJS } from "chart.js";
+import { BarChart3, TrendingUp } from "lucide-solid";
 
-const threeDaysAgo = (): Date => {
+const sevenDaysAgo = (): Date => {
     const d = new Date();
-    d.setDate(d.getDate() - 3);
+    d.setDate(d.getDate() - 7);
     return d;
 };
 
@@ -41,6 +41,7 @@ const getAxisLabel = (axisId: string): string => {
             return "值";
     }
 };
+
 interface Filters {
     startTime: Date;
     endTime: Date;
@@ -140,80 +141,134 @@ const MultiSelect = (props: {
 
 const StatsPage = (): JSX.Element => {
     const [filters, setFilters] = createSignal<Filters>({
-        startTime: threeDaysAgo(),
+        startTime: sevenDaysAgo(),
         endTime: todayEnd(),
         modelName: null,
         system: null,
     });
 
     const [selectedTimeRange, setSelectedTimeRange] =
-        createSignal<string>("3d");
+        createSignal<string>("7d");
+
+    // 改用新的 analytics API
+    const [timeseriesData] = createResource(filters, async (currentFilters) => {
+        try {
+            const filtersObj: Record<string, string[]> = {};
+            if (currentFilters.modelName)
+                filtersObj.model_name = [currentFilters.modelName];
+            if (currentFilters.system)
+                filtersObj.system = [currentFilters.system];
+
+            const query: TimeseriesQuery = {
+                dimension: undefined, // 总体趋势
+                metrics: [
+                    "total_runs",
+                    "successful_runs",
+                    "failed_runs",
+                    "error_rate",
+                    "avg_duration_ms",
+                    "p95_duration_ms",
+                    "p99_duration_ms",
+                    "total_tokens",
+                    "avg_tokens",
+                    "avg_ttft_ms",
+                    "distinct_users",
+                ],
+                granularity: "1h",
+                start_time: currentFilters.startTime.toISOString(),
+                end_time: currentFilters.endTime.toISOString(),
+                filters: Object.keys(filtersObj).length > 0 ? filtersObj : undefined,
+                limit: 1000,
+            };
+
+            const response = await getTimeseries(query);
+            return response;
+        } catch (err) {
+            console.error("Failed to fetch timeseries data", err);
+            return { success: false, data: [], meta: { total: 0, limit: 1000, offset: 0 } };
+        }
+    });
+
+    // 按模型统计的趋势数据
+    const [modelTimeseriesData] = createResource(filters, async (currentFilters) => {
+        try {
+            const filtersObj: Record<string, string[]> = {};
+            if (currentFilters.system)
+                filtersObj.system = [currentFilters.system];
+
+            const query: TimeseriesQuery = {
+                dimension: "model_name",
+                metrics: [
+                    "total_runs",
+                    "successful_runs",
+                    "failed_runs",
+                    "error_rate",
+                    "avg_duration_ms",
+                    "p95_duration_ms",
+                    "p99_duration_ms",
+                    "total_tokens",
+                    "avg_tokens",
+                    "avg_ttft_ms",
+                ],
+                granularity: "1h",
+                start_time: currentFilters.startTime.toISOString(),
+                end_time: currentFilters.endTime.toISOString(),
+                filters: Object.keys(filtersObj).length > 0 ? filtersObj : undefined,
+                limit: 1000,
+            };
+
+            const response = await getTimeseries(query);
+            return response;
+        } catch (err) {
+            console.error("Failed to fetch model timeseries data", err);
+            return { success: false, data: [], meta: { total: 0, limit: 1000, offset: 0 } };
+        }
+    });
 
     const [availableFilters] = createResource(async () => {
         try {
             const [models, systems] = await Promise.all([
-                ofetch("/trace/models"),
-                ofetch("/trace/systems"),
+                fetch("/trace/models").then(r => r.json()),
+                fetch("/trace/systems").then(r => r.json()),
             ]);
             return {
                 modelNames: (models.model_names || []) as string[],
                 systems: (systems.systems || []) as string[],
-                // runTypes: (runTypes || []) as string[],
             };
         } catch (err) {
             console.error("Failed to fetch available filters", err);
-            return { modelNames: [], systems: [], runTypes: [] };
-        }
-    });
-
-    const [statsData] = createResource(filters, async (currentFilters) => {
-        try {
-            const params: Record<string, string> = {
-                startTime: currentFilters.startTime.toISOString(),
-                endTime: currentFilters.endTime.toISOString(),
-            };
-            if (currentFilters.modelName)
-                params.model_name = currentFilters.modelName;
-            if (currentFilters.system) params.system = currentFilters.system;
-
-            const response = await ofetch("/stats/hourly", {
-                params,
-            });
-            return (response.stats || []) as RunStatsHourlyRecord[];
-        } catch (err) {
-            console.error("Failed to fetch statistics", err);
-            return [];
+            return { modelNames: [], systems: [] };
         }
     });
 
     // 修改为多选指标
-    const [selectedMetrics, setSelectedMetrics] = createSignal<
-        (keyof RunStatsHourlyRecord)[]
-    >(["total_runs", "p99_duration_ms", "total_tokens_sum", "distinct_users"]);
+    const [selectedMetrics, setSelectedMetrics] = createSignal<string[]>([
+        "total_runs",
+        "p99_duration_ms",
+        "total_tokens",
+        "distinct_users",
+    ]);
 
     // 按模型统计趋势的独立多选指标
-    const [selectedMetric, setSelectedMetric] =
-        createSignal<keyof RunStatsHourlyRecord>("total_runs");
+    const [selectedMetric, setSelectedMetric] = createSignal<string>("total_runs");
 
     const availableMetrics: {
-        value: keyof RunStatsHourlyRecord;
+        value: string;
         label: string;
         yAxisId?: string;
         unit?: string;
     }[] = [
         { value: "total_runs", label: "总运行次数", yAxisId: "y" },
+        { value: "successful_runs", label: "成功次数", yAxisId: "y" },
+        { value: "failed_runs", label: "失败次数", yAxisId: "y" },
         { value: "error_rate", label: "错误率 (%)", yAxisId: "y1" },
         { value: "avg_duration_ms", label: "平均持续时间 (s)", yAxisId: "y2" },
         { value: "p95_duration_ms", label: "P95 持续时间 (s)", yAxisId: "y2" },
         { value: "p99_duration_ms", label: "P99 持续时间 (s)", yAxisId: "y2" },
         { value: "avg_ttft_ms", label: "平均首包时间 (s)", yAxisId: "y3" },
         { value: "p95_ttft_ms", label: "P95 首包时间 (s)", yAxisId: "y3" },
-        { value: "total_tokens_sum", label: "总 Token 数 (k)", yAxisId: "y4" },
-        {
-            value: "avg_tokens_per_run",
-            label: "平均 Token 数 (k)",
-            yAxisId: "y4",
-        },
+        { value: "total_tokens", label: "总 Token 数 (k)", yAxisId: "y4" },
+        { value: "avg_tokens", label: "平均 Token 数 (k)", yAxisId: "y4" },
         { value: "distinct_users", label: "独立用户数", yAxisId: "y" },
     ];
 
@@ -239,30 +294,26 @@ const StatsPage = (): JSX.Element => {
         "rgb(255, 159, 64)",
     ];
 
-    const modelColorsWithAlpha = modelColors.map((color) =>
-        color.replace("rgb", "rgba").replace(")", ", 0.5)"),
-    );
-
     const handleMetricChange = (event: Event) => {
         const target = event.target as HTMLSelectElement;
-        setSelectedMetric(target.value as keyof RunStatsHourlyRecord);
+        setSelectedMetric(target.value);
     };
 
     // 修改图表数据生成逻辑以支持多指标
     const chartData = createMemo(() => {
-        const data = statsData() || [];
+        const data = timeseriesData()?.data || [];
         const metrics = selectedMetrics();
 
         if (!data.length || !metrics.length) {
             return { labels: [], datasets: [] };
         }
 
-        const labels = data.map((d) => new Date(d.stat_hour).toLocaleString());
+        const labels = data.map((d) => new Date(d.time).toLocaleString());
 
         const datasets = metrics.map((metric, index) => {
             const metricInfo = availableMetrics.find((m) => m.value === metric);
             const values = data.map((d) => {
-                let value = d[metric] as number;
+                let value = d.metrics[metric] as number;
                 if (metric === "error_rate") {
                     value *= 100;
                 } else if (
@@ -362,66 +413,57 @@ const StatsPage = (): JSX.Element => {
     });
 
     const newModelChartData = createMemo(() => {
-        const data = statsData() || [];
-        const metric = selectedMetric(); // 使用单选指标信号
+        const data = modelTimeseriesData()?.data || [];
+        const metric = selectedMetric();
 
         if (!data.length) {
             return { labels: [], datasets: [] };
         }
 
-        const labels = [...new Set(data.map((d) => d.stat_hour))].sort();
-        const localeLabels = labels.map((l) => new Date(l).toLocaleString());
+        // 按模型分组数据
+        const dataByModel = new Map<string, Array<{ time: string; value: number }>>();
 
-        const dataByModel = data.reduce((acc, record) => {
-            const modelName = record.model_name || "未知模型";
-            if (!acc[modelName]) {
-                acc[modelName] = [];
+        data.forEach((d) => {
+            const modelName = d.dimensions?.model_name || "未知模型";
+            if (!dataByModel.has(modelName)) {
+                dataByModel.set(modelName, []);
             }
-            acc[modelName].push(record);
-            return acc;
-        }, {} as Record<string, RunStatsHourlyRecord[]>);
+            let value = d.metrics[metric] as number;
+            if (metric === "error_rate") {
+                value *= 100;
+            } else if (
+                metric.includes("duration_ms") ||
+                metric.includes("ttft_ms")
+            ) {
+                value /= 1000;
+            } else if (metric.includes("tokens")) {
+                value /= 1000;
+            }
+            dataByModel.get(modelName)!.push({ time: d.time, value });
+        });
 
-        const datasets = Object.keys(dataByModel).map((modelName, index) => {
-            const modelData = dataByModel[modelName];
-            const hourDataMap = new Map(modelData.map((d) => [d.stat_hour, d]));
-
-            const chartDataPoints = labels.map((label) => {
-                const record = hourDataMap.get(label);
-                if (!record) return null;
-
-                let value = record[metric] as number;
-                if (metric === "error_rate") {
-                    value *= 100;
-                } else if (
-                    metric.includes("duration_ms") ||
-                    metric.includes("ttft_ms")
-                ) {
-                    value /= 1000; // Convert ms to s
-                } else if (metric.includes("tokens")) {
-                    value /= 1000; // Convert tokens to k
-                }
-                return value;
-            });
-
-            return {
+        const datasets: any[] = [];
+        let index = 0;
+        dataByModel.forEach((modelData, modelName) => {
+            const color = modelColors[index % modelColors.length];
+            datasets.push({
                 label: modelName,
-                data: chartDataPoints,
-                borderColor: metricColors[index % metricColors.length],
-                backgroundColor: metricColors[index % metricColors.length]
-                    .replace("rgb", "rgba")
-                    .replace(")", ", 0.5)"),
+                data: modelData.map((d) => d.value),
+                borderColor: color,
+                backgroundColor: color.replace("rgb", "rgba").replace(")", ", 0.5)"),
                 tension: 0.1,
-            };
+            });
+            index++;
         });
 
         return {
-            labels: localeLabels,
+            labels: data.map((d) => new Date(d.time).toLocaleString()),
             datasets,
         };
     });
 
     const newModelChartOptions = createMemo(() => {
-        const metric = selectedMetric(); // 使用单选指标信号
+        const metric = selectedMetric();
         const metricInfo = availableMetrics.find((m) => m.value === metric);
         const titleText = `按模型统计趋势 - ${metricInfo?.label || ""}`;
 
@@ -496,102 +538,6 @@ const StatsPage = (): JSX.Element => {
         const target = event.target as HTMLSelectElement;
         handleFilterChange(type, target.value || null);
     };
-
-    const statsColumns: TableColumn<RunStatsHourlyRecord>[] = [
-        {
-            header: "小时",
-            key: "stat_hour",
-            class: "px-6 py-4 whitespace-nowrap text-sm text-gray-900",
-            format: (row) => {
-                const startTime = new Date(row.stat_hour);
-                const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // Add 1 hour
-
-                return (
-                    <A
-                        href={`/llm-records?start_time_after=${startTime.toISOString()}&start_time_before=${endTime.toISOString()}`}
-                        class="text-blue-600 hover:underline"
-                    >
-                        {new Date(row.stat_hour).toLocaleString()}
-                    </A>
-                );
-            },
-        },
-        {
-            header: "模型",
-            key: "model_name",
-            class: "px-6 py-4 whitespace-nowrap text-sm text-gray-500",
-            format: (row) => row.model_name || "N/A",
-        },
-        {
-            header: "系统",
-            key: "system",
-            class: "px-6 py-4 whitespace-nowrap text-sm text-gray-500",
-            format: (row) => row.system || "N/A",
-        },
-        {
-            header: "运行统计",
-            key: ["total_runs", "successful_runs", "failed_runs"],
-            class: "px-6 py-4 whitespace-nowrap text-sm text-gray-900",
-            format: (row) => (
-                <>
-                    总: {row.total_runs}
-                    <br />
-                    成: {row.successful_runs}
-                    <br />
-                    败: {row.failed_runs}
-                </>
-            ),
-        },
-        {
-            header: "错误率",
-            key: "error_rate",
-            class: "px-6 py-4 whitespace-nowrap text-sm text-gray-900",
-            format: (row) => `${(row.error_rate * 100).toFixed(2)}%`,
-        },
-        {
-            header: "持续时间 (s)",
-            key: ["avg_duration_ms", "p95_duration_ms", "p99_duration_ms"],
-            class: "px-6 py-4 whitespace-nowrap text-sm text-gray-900",
-            format: (row) => (
-                <>
-                    平均: {(row.avg_duration_ms / 1000).toFixed(1)}
-                    <br />
-                    P95: {(row.p95_duration_ms / 1000).toFixed(1)}
-                    <br />
-                    P99: {(row.p99_duration_ms / 1000).toFixed(1)}
-                </>
-            ),
-        },
-        {
-            header: "Token (总/平均)",
-            key: ["total_tokens_sum", "avg_tokens_per_run"],
-            class: "px-6 py-4 whitespace-nowrap text-sm text-gray-900",
-            format: (row) => (
-                <>
-                    总: {(row.total_tokens_sum / 1000).toFixed(1)}k
-                    <br />
-                    平均: {(row.avg_tokens_per_run / 1000).toFixed(1)}k
-                </>
-            ),
-        },
-        {
-            header: "首包时间 (s)",
-            key: ["avg_ttft_ms", "p95_ttft_ms"],
-            class: "px-6 py-4 whitespace-nowrap text-sm text-gray-900",
-            format: (row) => (
-                <>
-                    平均: {(row.avg_ttft_ms / 1000).toFixed(1)}
-                    <br />
-                    P95: {(row.p95_ttft_ms / 1000).toFixed(1)}
-                </>
-            ),
-        },
-        {
-            header: "独立用户数",
-            key: "distinct_users",
-            class: "px-6 py-4 whitespace-nowrap text-sm text-gray-900",
-        },
-    ];
 
     return (
         <div class="bg-gray-50 min-h-screen">
@@ -678,11 +624,11 @@ const StatsPage = (): JSX.Element => {
                                 placeholder="选择统计指标"
                             />
                         </div>
-                        {statsData.loading ? (
+                        {timeseriesData.loading ? (
                             <div class="text-center p-8 text-gray-500">
                                 正在加载图表数据...
                             </div>
-                        ) : statsData()?.length && selectedMetrics().length ? (
+                        ) : timeseriesData()?.data?.length && selectedMetrics().length ? (
                             <div class="h-full">
                                 <Chart
                                     type="line"
@@ -709,6 +655,8 @@ const StatsPage = (): JSX.Element => {
                                 onchange={(e) => handleMetricChange(e)}
                             >
                                 <option value="total_runs">总运行次数</option>
+                                <option value="successful_runs">成功次数</option>
+                                <option value="failed_runs">失败次数</option>
                                 <option value="error_rate">错误率</option>
                                 <option value="avg_duration_ms">
                                     平均持续时间
@@ -725,18 +673,15 @@ const StatsPage = (): JSX.Element => {
                                 <option value="p95_ttft_ms">
                                     P95 首包时间
                                 </option>
-                                <option value="total_tokens_sum">
+                                <option value="total_tokens">
                                     总 Token 数
                                 </option>
-                                <option value="avg_tokens_per_run">
+                                <option value="avg_tokens">
                                     平均 Token 数
-                                </option>
-                                <option value="distinct_users">
-                                    独立用户数
                                 </option>
                             </select>
                         </div>
-                        {statsData.loading ? (
+                        {modelTimeseriesData.loading ? (
                             <div class="text-center p-8 text-gray-500">
                                 正在加载图表数据...
                             </div>
@@ -748,21 +693,78 @@ const StatsPage = (): JSX.Element => {
                             />
                         ) : (
                             <div class="text-center p-8 text-gray-500">
-                                {selectedMetric() === "total_runs"
-                                    ? "请选择一个统计指标"
-                                    : "没有符合所选筛选器的数据可用于按模型图表。"}
+                                没有符合所选筛选器的数据可用于按模型图表。
                             </div>
                         )}
                     </div>
                 </div>
 
-                <Table
-                    columnsConfig={statsColumns}
-                    data={statsData() || []}
-                    loading={statsData.loading}
-                    error={statsData.error}
-                    onRowClick={() => {}}
-                />
+                {/* Data Table */}
+                {timeseriesData()?.data?.length > 0 && (
+                    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+                        <h2 class="text-lg font-semibold text-gray-700 mb-3">
+                            数据详情
+                        </h2>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-gray-200">
+                                        <th class="px-4 py-2 text-left font-medium text-gray-700">
+                                            时间
+                                        </th>
+                                        <th class="px-4 py-2 text-left font-medium text-gray-700">
+                                            总运行次数
+                                        </th>
+                                        <th class="px-4 py-2 text-left font-medium text-gray-700">
+                                            成功/失败
+                                        </th>
+                                        <th class="px-4 py-2 text-left font-medium text-gray-700">
+                                            错误率
+                                        </th>
+                                        <th class="px-4 py-2 text-left font-medium text-gray-700">
+                                            平均延迟
+                                        </th>
+                                        <th class="px-4 py-2 text-left font-medium text-gray-700">
+                                            Token 数
+                                        </th>
+                                        <th class="px-4 py-2 text-left font-medium text-gray-700">
+                                            独立用户数
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <For each={timeseriesData()?.data || []}>
+                                        {(item) => (
+                                            <tr class="border-b border-gray-100">
+                                                <td class="px-4 py-2 text-gray-900">
+                                                    {new Date(item.time).toLocaleString()}
+                                                </td>
+                                                <td class="px-4 py-2 text-gray-900">
+                                                    {item.metrics.total_runs?.toLocaleString() || 0}
+                                                </td>
+                                                <td class="px-4 py-2 text-gray-600">
+                                                    {item.metrics.successful_runs?.toLocaleString() || 0} / {item.metrics.failed_runs?.toLocaleString() || 0}
+                                                </td>
+                                                <td class="px-4 py-2 text-gray-900">
+                                                    {(item.metrics.error_rate || 0 * 100).toFixed(2)}%
+                                                </td>
+                                                <td class="px-4 py-2 text-gray-900">
+                                                    {((item.metrics.avg_duration_ms || 0) / 1000).toFixed(2)}s
+                                                </td>
+                                                <td class="px-4 py-2 text-gray-900">
+                                                    {((item.metrics.total_tokens || 0) / 1000).toFixed(1)}k
+                                                </td>
+                                                <td class="px-4 py-2 text-gray-900">
+                                                    {item.metrics.distinct_users?.toLocaleString() || 0}
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </For>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

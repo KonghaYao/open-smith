@@ -27,6 +27,11 @@ export class RunRepository {
         // 从 extra 中提取 user_id
         const userId = extractUserIdFromExtra(runData.extra);
 
+        // 格式化时间戳，使用当前时间作为默认值
+        const startTime =
+            formatTimestamp(runData.start_time) || now.toISOString();
+        const endTime = formatTimestamp(runData.end_time) || now.toISOString();
+
         const record: RunRecord = {
             id,
             trace_id: runData.trace_id,
@@ -35,8 +40,8 @@ export class RunRepository {
             system: runData.system,
             thread_id: threadId,
             user_id: userId,
-            start_time: formatTimestamp(runData.start_time)!,
-            end_time: formatTimestamp(runData.end_time)!,
+            start_time: startTime,
+            end_time: endTime,
             inputs: runData.inputs ? JSON.stringify(runData.inputs) : undefined,
             outputs: runData.outputs
                 ? JSON.stringify(runData.outputs)
@@ -118,27 +123,28 @@ export class RunRepository {
             updateData.system = runData.system;
         }
         if (runData.start_time !== undefined) {
-            updateData.start_time = new Date(formatTimestamp(runData.start_time)!);
+            const startTime = formatTimestamp(runData.start_time);
+            if (startTime) {
+                updateData.start_time = new Date(startTime);
+            }
         }
         if (runData.end_time !== undefined) {
-            updateData.end_time = new Date(formatTimestamp(runData.end_time)!);
+            const endTime = formatTimestamp(runData.end_time);
+            if (endTime) {
+                updateData.end_time = new Date(endTime);
+            }
         }
         if (runData.inputs !== undefined) {
             updateData.inputs = JSON.stringify(runData.inputs);
-        }
-        if (runData.outputs !== undefined) {
-            updateData.outputs = JSON.stringify(runData.outputs);
             updateData.total_tokens = extractTotalTokensFromOutputs(
-                runData.outputs,
+                runData.inputs,
             );
-            updateData.model_name = extractModelNameFromOutputs(
-                runData.outputs,
-            );
+            updateData.model_name = extractModelNameFromOutputs(runData.inputs);
         } else if (runData.total_tokens !== undefined) {
             updateData.total_tokens = runData.total_tokens;
         }
 
-        if (runData.model_name !== undefined && runData.outputs === undefined) {
+        if (runData.model_name !== undefined && runData.inputs === undefined) {
             updateData.model_name = runData.model_name;
         }
 
@@ -243,263 +249,100 @@ export class RunRepository {
             return null;
         }
 
-        return this.mapDbToRunRecord(run);
+        return {
+            ...run,
+            inputs: run.inputs ? run.inputs : undefined,
+            outputs: run.outputs ? run.outputs : undefined,
+            events: run.events ? run.events : undefined,
+            error: run.error ? run.error : undefined,
+            extra: run.extra ? run.extra : undefined,
+            serialized: run.serialized ? run.serialized : undefined,
+            tags: run.tags ? run.tags : undefined,
+            feedback_count: run.feedback_count || 0,
+            attachments_count: run.attachments_count || 0,
+            feedback: [],
+            attachments: [],
+        };
     }
 
-    // 根据 trace_id 获取所有 Runs
-    async getRunsByTraceId(traceId: string): Promise<RunRecord[]> {
-        const runs = await this.db
-            .selectFrom("runs")
-            .selectAll()
-            .where("trace_id", "=", traceId)
-            .orderBy("start_time", "asc")
-            .execute();
-
-        return runs.map((run) => this.mapDbToRunRecord(run));
-    }
-
-    // 根据 system 获取所有 Runs
-    async getRunsBySystem(system: string): Promise<RunRecord[]> {
-        const runs = await this.db
-            .selectFrom("runs")
-            .selectAll()
-            .where("system", "=", system)
-            .orderBy("start_time", "desc")
-            .execute();
-
-        return runs.map((run) => this.mapDbToRunRecord(run));
-    }
-
-    // 根据 thread_id 获取所有 Runs
-    async getRunsByThreadId(threadId: string): Promise<RunRecord[]> {
-        const runs = await this.db
-            .selectFrom("runs")
-            .selectAll()
-            .where("thread_id", "=", threadId)
-            .orderBy("start_time", "asc")
-            .execute();
-
-        return runs.map((run) => this.mapDbToRunRecord(run));
-    }
-
-    // 根据 user_id 获取所有 Runs
-    async getRunsByUserId(userId: string): Promise<RunRecord[]> {
-        const runs = await this.db
-            .selectFrom("runs")
-            .selectAll()
-            .where("user_id", "=", userId)
-            .orderBy("start_time", "desc")
-            .execute();
-
-        return runs.map((run) => this.mapDbToRunRecord(run));
-    }
-
-    // 根据 run_type 获取 Runs (分页)
-    async getRunsByRunType(
-        runType: string,
-        limit: number,
-        offset: number,
-    ): Promise<RunRecord[]> {
-        const runs = await this.db
-            .selectFrom("runs")
-            .selectAll()
-            .where("run_type", "=", runType)
-            .orderBy("start_time", "desc")
-            .limit(limit)
-            .offset(offset)
-            .execute();
-
-        return runs.map((run) => this.mapDbToRunRecord(run));
-    }
-
-    // 统计指定 run_type 的 Runs 数量
-    async countRunsByRunType(runType: string): Promise<number> {
-        const result = await this.db
-            .selectFrom("runs")
-            .select((eb) => [eb.fn.count("id").as("count")])
-            .where("run_type", "=", runType)
-            .executeTakeFirst();
-
-        return Number(result?.count ?? 0);
-    }
-
-    // 根据条件查询 Runs
-    async getRunsByConditions(
-        conditions: {
-            run_type?: string;
+    // 获取多个 Runs
+    async getRuns(
+        limit: number = 100,
+        offset: number = 0,
+        filters?: {
             system?: string;
             model_name?: string;
             thread_id?: string;
             user_id?: string;
-            tag?: string;
-            start_time_after?: string;
-            start_time_before?: string;
+            run_type?: string;
+            start_time_after?: Date;
+            start_time_before?: Date;
         },
-        limit: number,
-        offset: number,
     ): Promise<RunRecord[]> {
-        let query = this.db.selectFrom("runs").selectAll();
-
-        if (conditions.run_type) {
-            query = query.where("run_type", "=", conditions.run_type);
-        }
-        if (conditions.system) {
-            query = query.where("system", "=", conditions.system);
-        }
-        if (conditions.model_name) {
-            query = query.where("model_name", "=", conditions.model_name);
-        }
-        if (conditions.thread_id) {
-            query = query.where("thread_id", "=", conditions.thread_id);
-        }
-        if (conditions.user_id) {
-            query = query.where("user_id", "=", conditions.user_id);
-        }
-        if (conditions.start_time_after) {
-            query = query.where(
-                "start_time",
-                ">=",
-                new Date(conditions.start_time_after),
-            );
-        }
-        if (conditions.start_time_before) {
-            query = query.where(
-                "start_time",
-                "<=",
-                new Date(conditions.start_time_before),
-            );
-        }
-
-        const runs = await query
-            .orderBy("start_time", "desc")
-            .limit(limit)
-            .offset(offset)
-            .execute();
-
-        return runs.map((run) => this.mapDbToRunRecord(run));
-    }
-
-    // 统计符合条件的 Runs 数量
-    async countRunsByConditions(conditions: {
-        run_type?: string;
-        system?: string;
-        model_name?: string;
-        thread_id?: string;
-        user_id?: string;
-        tag?: string;
-        start_time_after?: string;
-        start_time_before?: string;
-    }): Promise<number> {
         let query = this.db
             .selectFrom("runs")
-            .select((eb) => [eb.fn.count("id").as("count")]);
+            .selectAll()
+            .orderBy("start_time", "desc")
+            .limit(limit)
+            .offset(offset);
 
-        if (conditions.run_type) {
-            query = query.where("run_type", "=", conditions.run_type);
+        if (filters) {
+            if (filters.system) {
+                query = query.where("system", "=", filters.system);
+            }
+            if (filters.model_name) {
+                query = query.where("model_name", "=", filters.model_name);
+            }
+            if (filters.thread_id) {
+                query = query.where("thread_id", "=", filters.thread_id);
+            }
+            if (filters.user_id) {
+                query = query.where("user_id", "=", filters.user_id);
+            }
+            if (filters.run_type) {
+                query = query.where("run_type", "=", filters.run_type);
+            }
+            if (filters.start_time_after) {
+                query = query.where(
+                    "start_time",
+                    ">=",
+                    filters.start_time_after,
+                );
+            }
+            if (filters.start_time_before) {
+                query = query.where(
+                    "start_time",
+                    "<=",
+                    filters.start_time_before,
+                );
+            }
         }
-        if (conditions.system) {
-            query = query.where("system", "=", conditions.system);
-        }
-        if (conditions.model_name) {
-            query = query.where("model_name", "=", conditions.model_name);
-        }
-        if (conditions.thread_id) {
-            query = query.where("thread_id", "=", conditions.thread_id);
-        }
-        if (conditions.user_id) {
-            query = query.where("user_id", "=", conditions.user_id);
-        }
-        if (conditions.start_time_after) {
-            query = query.where(
-                "start_time",
-                ">=",
-                new Date(conditions.start_time_after),
-            );
-        }
-        if (conditions.start_time_before) {
-            query = query.where(
-                "start_time",
-                "<=",
-                new Date(conditions.start_time_before),
-            );
-        }
 
-        const result = await query.executeTakeFirst();
-        return Number(result?.count ?? 0);
-    }
+        const runs = await query.execute();
 
-    // 获取所有 thread_id
-    async getAllThreadIds(): Promise<string[]> {
-        const results = await this.db
-            .selectFrom("runs")
-            .select("thread_id")
-            .where("thread_id", "is not", null)
-            .distinct()
-            .execute();
-
-        return results.map((r) => r.thread_id!).filter(Boolean);
-    }
-
-    // 获取所有 user_id
-    async getAllUserIds(): Promise<string[]> {
-        const results = await this.db
-            .selectFrom("runs")
-            .select("user_id")
-            .where("user_id", "is not", null)
-            .distinct()
-            .execute();
-
-        return results.map((r) => r.user_id!).filter(Boolean);
-    }
-
-    // 获取所有 model_name
-    async getAllModelNames(): Promise<string[]> {
-        const results = await this.db
-            .selectFrom("runs")
-            .select("model_name")
-            .where("model_name", "is not", null)
-            .distinct()
-            .execute();
-
-        return results.map((r) => r.model_name!).filter(Boolean);
-    }
-
-    // 映射数据库记录到 RunRecord
-    private mapDbToRunRecord(dbRecord: any): RunRecord {
-        return {
-            id: dbRecord.id,
-            trace_id: dbRecord.trace_id ?? undefined,
-            name: dbRecord.name ?? "",
-            run_type: dbRecord.run_type ?? undefined,
-            system: dbRecord.system ?? undefined,
-            thread_id: dbRecord.thread_id ?? undefined,
-            user_id: dbRecord.user_id ?? undefined,
-            start_time: dbRecord.start_time
-                ? new Date(dbRecord.start_time).toISOString()
-                : "",
-            end_time: dbRecord.end_time
-                ? new Date(dbRecord.end_time).toISOString()
-                : "",
-            inputs: dbRecord.inputs ?? undefined,
-            outputs: dbRecord.outputs ?? undefined,
-            events: dbRecord.events ?? undefined,
-            error: dbRecord.error ?? undefined,
-            extra: dbRecord.extra ?? undefined,
-            serialized: dbRecord.serialized ?? undefined,
-            total_tokens: dbRecord.total_tokens ?? 0,
-            model_name: dbRecord.model_name ?? undefined,
-            time_to_first_token: dbRecord.time_to_first_token ?? 0,
-            tags: dbRecord.tags ?? undefined,
-            created_at: dbRecord.created_at
-                ? new Date(dbRecord.created_at).toISOString()
-                : "",
-            updated_at: dbRecord.updated_at
-                ? new Date(dbRecord.updated_at).toISOString()
-                : "",
-            feedback_count: 0,
-            attachments_count: 0,
+        return runs.map((run) => ({
+            ...run,
+            inputs: run.inputs ? JSON.parse(run.inputs) : undefined,
+            outputs: run.outputs ? JSON.parse(run.outputs) : undefined,
+            events: run.events ? JSON.parse(run.events) : undefined,
+            error: run.error ? JSON.parse(run.error) : undefined,
+            extra: run.extra ? JSON.parse(run.extra) : undefined,
+            serialized: run.serialized ? JSON.parse(run.serialized) : undefined,
+            tags: run.tags ? JSON.parse(run.tags) : undefined,
+            feedback_count: run.feedback_count || 0,
+            attachments_count: run.attachments_count || 0,
             feedback: [],
             attachments: [],
-        };
+        }));
+    }
+
+    // 删除 Run
+    async deleteRun(runId: string): Promise<boolean> {
+        const result = await this.db
+            .deleteFrom("runs")
+            .where("id", "=", runId)
+            .executeTakeFirst();
+
+        return (result.numDeletedRows ?? 0n) > 0n;
     }
 }

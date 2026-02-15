@@ -1,39 +1,7 @@
 -- Open Smith TimescaleDB 数据库初始化脚本
--- 版本: 1.0
+-- 版本: 2.0
 -- 创建日期: 2026-02-15
-
--- =====================================================
--- 0. 清理旧表（如果存在且结构不正确）
--- =====================================================
-
--- 如果 runs 表存在但使用旧的单列主键，需要删除它
--- 注意：这会删除所有现有数据！仅用于开发环境
-DO $$
-BEGIN
-    -- 检查 runs 表是否是 hypertable
-    IF EXISTS (SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = 'runs') THEN
-        -- 删除 hypertable
-        PERFORM drop_chunks('runs', newer_than => NOW());
-    END IF;
-
-    -- 删除表（如果存在）
-    DROP TABLE IF EXISTS run_stats_monthly CASCADE;
-    DROP TABLE IF EXISTS run_stats_weekly CASCADE;
-    DROP TABLE IF EXISTS run_stats_daily CASCADE;
-    DROP TABLE IF EXISTS run_stats_15min CASCADE;
-    DROP TABLE IF EXISTS run_stats_hourly CASCADE;
-    DROP TABLE IF EXISTS run_stats_raw CASCADE;
-    DROP TABLE IF EXISTS runs CASCADE;
-    DROP TABLE IF EXISTS feedback CASCADE;
-    DROP TABLE IF EXISTS attachments CASCADE;
-    DROP TABLE IF EXISTS systems CASCADE;
-
-    -- 删除旧的触发器函数
-    DROP FUNCTION IF EXISTS update_stats_raw() CASCADE;
-    DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
-
-    RAISE NOTICE 'Old tables and functions dropped';
-END $$;
+-- 更新日期: 2026-02-15 - 修复初始化逻辑
 
 -- =====================================================
 -- 1. 创建扩展
@@ -90,13 +58,23 @@ CREATE TABLE IF NOT EXISTS runs (
 );
 
 -- 创建超表，按 start_time 分区
-SELECT create_hypertable('runs', 'start_time', if_not_exists => TRUE);
-
--- 为 runs 表的 id 列添加唯一约束（用于外键引用）
--- 注意：虽然在 TimescaleDB hypertable 上创建唯一约束有限制，
--- 但我们需要确保 id 列是唯一的，以便其他表可以引用它
--- 由于 (id, start_time) 已经是主键，id 本身实际上就是唯一的
--- PostgreSQL 在复合主键上允许引用单个列，只要该列在主键中
+-- 注意：create_hypertable 使用 if_not_exists 参数时需要特殊处理
+DO $$
+BEGIN
+    -- 检查 runs 表是否已经是 hypertable
+    IF NOT EXISTS (
+        SELECT 1 FROM timescaledb_information.hypertables
+        WHERE hypertable_name = 'runs'
+    ) THEN
+        PERFORM create_hypertable('runs', 'start_time', if_not_exists => TRUE);
+        RAISE NOTICE 'Created hypertable for runs';
+    ELSE
+        RAISE NOTICE 'Runs table is already a hypertable';
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Error creating hypertable for runs (may already exist): %', SQLERRM;
+END $$;
 
 -- 创建 runs 表索引
 CREATE INDEX IF NOT EXISTS idx_runs_system ON runs (system);
@@ -169,7 +147,22 @@ CREATE TABLE IF NOT EXISTS run_stats_raw (
 );
 
 -- 创建超表，按 stat_hour 分区
-SELECT create_hypertable('run_stats_raw', 'stat_hour', if_not_exists => TRUE);
+DO $$
+BEGIN
+    -- 检查 run_stats_raw 表是否已经是 hypertable
+    IF NOT EXISTS (
+        SELECT 1 FROM timescaledb_information.hypertables
+        WHERE hypertable_name = 'run_stats_raw'
+    ) THEN
+        PERFORM create_hypertable('run_stats_raw', 'stat_hour', if_not_exists => TRUE);
+        RAISE NOTICE 'Created hypertable for run_stats_raw';
+    ELSE
+        RAISE NOTICE 'run_stats_raw table is already a hypertable';
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Error creating hypertable for run_stats_raw (may already exist): %', SQLERRM;
+END $$;
 
 -- 创建索引
 CREATE INDEX IF NOT EXISTS idx_run_stats_raw_system ON run_stats_raw (system);
@@ -181,191 +174,276 @@ CREATE INDEX IF NOT EXISTS idx_run_stats_raw_stat_hour ON run_stats_raw (stat_ho
 -- =====================================================
 
 -- 4.1 小时级聚合视图
-CREATE MATERIALIZED VIEW IF NOT EXISTS run_stats_hourly
-WITH (timescaledb.continuous)
-AS
-SELECT
-    time_bucket('1 hour', stat_hour) AS stat_hour,
-    model_name,
-    system,
-    COUNT(*) AS total_runs,
-    SUM(CASE WHEN is_success THEN 1 ELSE 0 END) AS successful_runs,
-    SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END) AS failed_runs,
-    (SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0)) AS error_rate,
-    SUM(duration_ms) AS total_duration_ms,
-    AVG(duration_ms) AS avg_duration_ms,
-    percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration_ms,
-    percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_duration_ms,
-    SUM(token_count) AS total_tokens_sum,
-    AVG(token_count) AS avg_tokens_per_run,
-    AVG(ttft_ms) AS avg_ttft_ms,
-    percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95_ttft_ms,
-    COUNT(DISTINCT user_id) AS distinct_users
-FROM run_stats_raw
-GROUP BY time_bucket('1 hour', stat_hour), model_name, system
-WITH NO DATA;
+DO $$
+BEGIN
+    -- 检查视图是否已存在
+    IF NOT EXISTS (
+        SELECT 1 FROM timescaledb_information.continuous_aggregates
+        WHERE view_name = 'run_stats_hourly'
+    ) THEN
+        EXECUTE format('
+            CREATE MATERIALIZED VIEW run_stats_hourly
+            WITH (timescaledb.continuous)
+            AS
+            SELECT
+                time_bucket(''1 hour'', stat_hour) AS stat_hour,
+                model_name,
+                system,
+                COUNT(*) AS total_runs,
+                SUM(CASE WHEN is_success THEN 1 ELSE 0 END) AS successful_runs,
+                SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END) AS failed_runs,
+                (SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0)) AS error_rate,
+                SUM(duration_ms) AS total_duration_ms,
+                AVG(duration_ms) AS avg_duration_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration_ms,
+                percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_duration_ms,
+                SUM(token_count) AS total_tokens_sum,
+                AVG(token_count) AS avg_tokens_per_run,
+                AVG(ttft_ms) AS avg_ttft_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95_ttft_ms,
+                COUNT(DISTINCT user_id) AS distinct_users
+            FROM run_stats_raw
+            GROUP BY time_bucket(''1 hour'', stat_hour), model_name, system
+            WITH NO DATA
+        ');
 
--- 配置小时级聚合刷新策略
-SELECT add_continuous_aggregate_policy('run_stats_hourly',
-    start_offset => INTERVAL '3 hours',
-    end_offset => INTERVAL '1 minute',
-    schedule_interval => INTERVAL '5 minutes',
-    if_not_exists => TRUE
-);
+        -- 配置小时级聚合刷新策略
+        PERFORM add_continuous_aggregate_policy('run_stats_hourly',
+            start_offset => INTERVAL '3 hours',
+            end_offset => INTERVAL '1 minute',
+            schedule_interval => INTERVAL '5 minutes',
+            if_not_exists => TRUE
+        );
 
--- Note: Continuous aggregates should not have unique constraints as they are automatically refreshed
--- Use regular index for query performance instead
-CREATE INDEX IF NOT EXISTS idx_run_stats_hourly_lookup
-ON run_stats_hourly (stat_hour DESC, model_name, system);
+        -- 创建索引
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_run_stats_hourly_lookup
+            ON run_stats_hourly (stat_hour DESC, model_name, system)';
+
+        RAISE NOTICE 'Created continuous aggregate view: run_stats_hourly';
+    ELSE
+        RAISE NOTICE 'Continuous aggregate view run_stats_hourly already exists';
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Error creating continuous aggregate run_stats_hourly: %', SQLERRM;
+END $$;
 
 -- 4.2 15分钟级聚合视图
-CREATE MATERIALIZED VIEW IF NOT EXISTS run_stats_15min
-WITH (timescaledb.continuous)
-AS
-SELECT
-    time_bucket('15 minutes', stat_hour) AS stat_period,
-    model_name,
-    system,
-    COUNT(*) AS total_runs,
-    SUM(CASE WHEN is_success THEN 1 ELSE 0 END) AS successful_runs,
-    SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END) AS failed_runs,
-    (SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0)) AS error_rate,
-    SUM(duration_ms) AS total_duration_ms,
-    AVG(duration_ms) AS avg_duration_ms,
-    percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration_ms,
-    percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_duration_ms,
-    SUM(token_count) AS total_tokens_sum,
-    AVG(token_count) AS avg_tokens_per_run,
-    AVG(ttft_ms) AS avg_ttft_ms,
-    percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95_ttft_ms,
-    COUNT(DISTINCT user_id) AS distinct_users
-FROM run_stats_raw
-GROUP BY time_bucket('15 minutes', stat_hour), model_name, system
-WITH NO DATA;
+DO $$
+BEGIN
+    -- 检查视图是否已存在
+    IF NOT EXISTS (
+        SELECT 1 FROM timescaledb_information.continuous_aggregates
+        WHERE view_name = 'run_stats_15min'
+    ) THEN
+        EXECUTE format('
+            CREATE MATERIALIZED VIEW run_stats_15min
+            WITH (timescaledb.continuous)
+            AS
+            SELECT
+                time_bucket(''15 minutes'', stat_hour) AS stat_period,
+                model_name,
+                system,
+                COUNT(*) AS total_runs,
+                SUM(CASE WHEN is_success THEN 1 ELSE 0 END) AS successful_runs,
+                SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END) AS failed_runs,
+                (SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0)) AS error_rate,
+                SUM(duration_ms) AS total_duration_ms,
+                AVG(duration_ms) AS avg_duration_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration_ms,
+                percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_duration_ms,
+                SUM(token_count) AS total_tokens_sum,
+                AVG(token_count) AS avg_tokens_per_run,
+                AVG(ttft_ms) AS avg_ttft_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95_ttft_ms,
+                COUNT(DISTINCT user_id) AS distinct_users
+            FROM run_stats_raw
+            GROUP BY time_bucket(''15 minutes'', stat_hour), model_name, system
+            WITH NO DATA
+        ');
 
--- 配置 15分钟级聚合刷新策略
-SELECT add_continuous_aggregate_policy('run_stats_15min',
-    start_offset => INTERVAL '1 hour',
-    end_offset => INTERVAL '1 minute',
-    schedule_interval => INTERVAL '2 minutes',
-    if_not_exists => TRUE
-);
+        -- 配置 15分钟级聚合刷新策略
+        PERFORM add_continuous_aggregate_policy('run_stats_15min',
+            start_offset => INTERVAL '1 hour',
+            end_offset => INTERVAL '1 minute',
+            schedule_interval => INTERVAL '2 minutes',
+            if_not_exists => TRUE
+        );
 
--- Note: Continuous aggregates should not have unique constraints as they are automatically refreshed
--- Use regular index for query performance instead
-CREATE INDEX IF NOT EXISTS idx_run_stats_15min_lookup
-ON run_stats_15min (stat_period DESC, model_name, system);
+        -- 创建索引
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_run_stats_15min_lookup
+            ON run_stats_15min (stat_period DESC, model_name, system)';
+
+        RAISE NOTICE 'Created continuous aggregate view: run_stats_15min';
+    ELSE
+        RAISE NOTICE 'Continuous aggregate view run_stats_15min already exists';
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Error creating continuous aggregate run_stats_15min: %', SQLERRM;
+END $$;
 
 -- 4.3 天级聚合视图
-CREATE MATERIALIZED VIEW IF NOT EXISTS run_stats_daily
-WITH (timescaledb.continuous)
-AS
-SELECT
-    time_bucket('1 day', stat_hour) AS stat_period,
-    model_name,
-    system,
-    COUNT(*) AS total_runs,
-    SUM(CASE WHEN is_success THEN 1 ELSE 0 END) AS successful_runs,
-    SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END) AS failed_runs,
-    (SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0)) AS error_rate,
-    SUM(duration_ms) AS total_duration_ms,
-    AVG(duration_ms) AS avg_duration_ms,
-    percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration_ms,
-    percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_duration_ms,
-    SUM(token_count) AS total_tokens_sum,
-    AVG(token_count) AS avg_tokens_per_run,
-    AVG(ttft_ms) AS avg_ttft_ms,
-    percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95_ttft_ms,
-    COUNT(DISTINCT user_id) AS distinct_users
-FROM run_stats_raw
-GROUP BY time_bucket('1 day', stat_hour), model_name, system;
+DO $$
+BEGIN
+    -- 检查视图是否已存在
+    IF NOT EXISTS (
+        SELECT 1 FROM timescaledb_information.continuous_aggregates
+        WHERE view_name = 'run_stats_daily'
+    ) THEN
+        EXECUTE format('
+            CREATE MATERIALIZED VIEW run_stats_daily
+            WITH (timescaledb.continuous)
+            AS
+            SELECT
+                time_bucket(''1 day'', stat_hour) AS stat_period,
+                model_name,
+                system,
+                COUNT(*) AS total_runs,
+                SUM(CASE WHEN is_success THEN 1 ELSE 0 END) AS successful_runs,
+                SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END) AS failed_runs,
+                (SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0)) AS error_rate,
+                SUM(duration_ms) AS total_duration_ms,
+                AVG(duration_ms) AS avg_duration_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration_ms,
+                percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_duration_ms,
+                SUM(token_count) AS total_tokens_sum,
+                AVG(token_count) AS avg_tokens_per_run,
+                AVG(ttft_ms) AS avg_ttft_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95_ttft_ms,
+                COUNT(DISTINCT user_id) AS distinct_users
+            FROM run_stats_raw
+            GROUP BY time_bucket(''1 day'', stat_hour), model_name, system
+        ');
 
--- 配置天级聚合刷新策略
-SELECT add_continuous_aggregate_policy('run_stats_daily',
-    start_offset => INTERVAL '1 day',
-    end_offset => INTERVAL '1 hour',
-    schedule_interval => INTERVAL '30 minutes',
-    if_not_exists => TRUE
-);
+        -- 配置天级聚合刷新策略
+        PERFORM add_continuous_aggregate_policy('run_stats_daily',
+            start_offset => INTERVAL '1 day',
+            end_offset => INTERVAL '1 hour',
+            schedule_interval => INTERVAL '30 minutes',
+            if_not_exists => TRUE
+        );
 
--- Note: Continuous aggregates should not have unique constraints as they are automatically refreshed
--- Use regular index for query performance instead
-CREATE INDEX IF NOT EXISTS idx_run_stats_daily_lookup
-ON run_stats_daily (stat_period DESC, model_name, system);
+        -- 创建索引
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_run_stats_daily_lookup
+            ON run_stats_daily (stat_period DESC, model_name, system)';
+
+        RAISE NOTICE 'Created continuous aggregate view: run_stats_daily';
+    ELSE
+        RAISE NOTICE 'Continuous aggregate view run_stats_daily already exists';
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Error creating continuous aggregate run_stats_daily: %', SQLERRM;
+END $$;
 
 -- 4.4 周级聚合视图
-CREATE MATERIALIZED VIEW IF NOT EXISTS run_stats_weekly
-WITH (timescaledb.continuous)
-AS
-SELECT
-    time_bucket('1 week', stat_hour) AS stat_period,
-    model_name,
-    system,
-    COUNT(*) AS total_runs,
-    SUM(CASE WHEN is_success THEN 1 ELSE 0 END) AS successful_runs,
-    SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END) AS failed_runs,
-    (SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0)) AS error_rate,
-    SUM(duration_ms) AS total_duration_ms,
-    AVG(duration_ms) AS avg_duration_ms,
-    percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration_ms,
-    percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_duration_ms,
-    SUM(token_count) AS total_tokens_sum,
-    AVG(token_count) AS avg_tokens_per_run,
-    AVG(ttft_ms) AS avg_ttft_ms,
-    percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95_ttft_ms,
-    COUNT(DISTINCT user_id) AS distinct_users
-FROM run_stats_raw
-GROUP BY time_bucket('1 week', stat_hour), model_name, system;
+DO $$
+BEGIN
+    -- 检查视图是否已存在
+    IF NOT EXISTS (
+        SELECT 1 FROM timescaledb_information.continuous_aggregates
+        WHERE view_name = 'run_stats_weekly'
+    ) THEN
+        EXECUTE format('
+            CREATE MATERIALIZED VIEW run_stats_weekly
+            WITH (timescaledb.continuous)
+            AS
+            SELECT
+                time_bucket(''1 week'', stat_hour) AS stat_period,
+                model_name,
+                system,
+                COUNT(*) AS total_runs,
+                SUM(CASE WHEN is_success THEN 1 ELSE 0 END) AS successful_runs,
+                SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END) AS failed_runs,
+                (SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0)) AS error_rate,
+                SUM(duration_ms) AS total_duration_ms,
+                AVG(duration_ms) AS avg_duration_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration_ms,
+                percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_duration_ms,
+                SUM(token_count) AS total_tokens_sum,
+                AVG(token_count) AS avg_tokens_per_run,
+                AVG(ttft_ms) AS avg_ttft_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95_ttft_ms,
+                COUNT(DISTINCT user_id) AS distinct_users
+            FROM run_stats_raw
+            GROUP BY time_bucket(''1 week'', stat_hour), model_name, system
+        ');
 
--- 配置周级聚合刷新策略
-SELECT add_continuous_aggregate_policy('run_stats_weekly',
-    start_offset => INTERVAL '1 week',
-    end_offset => INTERVAL '1 day',
-    schedule_interval => INTERVAL '1 hour',
-    if_not_exists => TRUE
-);
+        -- 配置周级聚合刷新策略
+        PERFORM add_continuous_aggregate_policy('run_stats_weekly',
+            start_offset => INTERVAL '1 week',
+            end_offset => INTERVAL '1 day',
+            schedule_interval => INTERVAL '1 hour',
+            if_not_exists => TRUE
+        );
 
--- Note: Continuous aggregates should not have unique constraints as they are automatically refreshed
--- Use regular index for query performance instead
-CREATE INDEX IF NOT EXISTS idx_run_stats_weekly_lookup
-ON run_stats_weekly (stat_period DESC, model_name, system);
+        -- 创建索引
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_run_stats_weekly_lookup
+            ON run_stats_weekly (stat_period DESC, model_name, system)';
+
+        RAISE NOTICE 'Created continuous aggregate view: run_stats_weekly';
+    ELSE
+        RAISE NOTICE 'Continuous aggregate view run_stats_weekly already exists';
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Error creating continuous aggregate run_stats_weekly: %', SQLERRM;
+END $$;
 
 -- 4.5 月级聚合视图
-CREATE MATERIALIZED VIEW IF NOT EXISTS run_stats_monthly
-WITH (timescaledb.continuous)
-AS
-SELECT
-    time_bucket('1 month', stat_hour) AS stat_period,
-    model_name,
-    system,
-    COUNT(*) AS total_runs,
-    SUM(CASE WHEN is_success THEN 1 ELSE 0 END) AS successful_runs,
-    SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END) AS failed_runs,
-    (SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0)) AS error_rate,
-    SUM(duration_ms) AS total_duration_ms,
-    AVG(duration_ms) AS avg_duration_ms,
-    percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration_ms,
-    percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_duration_ms,
-    SUM(token_count) AS total_tokens_sum,
-    AVG(token_count) AS avg_tokens_per_run,
-    AVG(ttft_ms) AS avg_ttft_ms,
-    percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95_ttft_ms,
-    COUNT(DISTINCT user_id) AS distinct_users
-FROM run_stats_raw
-GROUP BY time_bucket('1 month', stat_hour), model_name, system;
+DO $$
+BEGIN
+    -- 检查视图是否已存在
+    IF NOT EXISTS (
+        SELECT 1 FROM timescaledb_information.continuous_aggregates
+        WHERE view_name = 'run_stats_monthly'
+    ) THEN
+        EXECUTE format('
+            CREATE MATERIALIZED VIEW run_stats_monthly
+            WITH (timescaledb.continuous)
+            AS
+            SELECT
+                time_bucket(''1 month'', stat_hour) AS stat_period,
+                model_name,
+                system,
+                COUNT(*) AS total_runs,
+                SUM(CASE WHEN is_success THEN 1 ELSE 0 END) AS successful_runs,
+                SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END) AS failed_runs,
+                (SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0)) AS error_rate,
+                SUM(duration_ms) AS total_duration_ms,
+                AVG(duration_ms) AS avg_duration_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration_ms,
+                percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_duration_ms,
+                SUM(token_count) AS total_tokens_sum,
+                AVG(token_count) AS avg_tokens_per_run,
+                AVG(ttft_ms) AS avg_ttft_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95_ttft_ms,
+                COUNT(DISTINCT user_id) AS distinct_users
+            FROM run_stats_raw
+            GROUP BY time_bucket(''1 month'', stat_hour), model_name, system
+        ');
 
--- 配置月级聚合刷新策略
-SELECT add_continuous_aggregate_policy('run_stats_monthly',
-    start_offset => INTERVAL '1 month',
-    end_offset => INTERVAL '1 day',
-    schedule_interval => INTERVAL '1 day',
-    if_not_exists => TRUE
-);
+        -- 配置月级聚合刷新策略
+        PERFORM add_continuous_aggregate_policy('run_stats_monthly',
+            start_offset => INTERVAL '1 month',
+            end_offset => INTERVAL '1 day',
+            schedule_interval => INTERVAL '1 day',
+            if_not_exists => TRUE
+        );
 
--- Note: Continuous aggregates should not have unique constraints as they are automatically refreshed
--- Use regular index for query performance instead
-CREATE INDEX IF NOT EXISTS idx_run_stats_monthly_lookup
-ON run_stats_monthly (stat_period DESC, model_name, system);
+        -- 创建索引
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_run_stats_monthly_lookup
+            ON run_stats_monthly (stat_period DESC, model_name, system)';
+
+        RAISE NOTICE 'Created continuous aggregate view: run_stats_monthly';
+    ELSE
+        RAISE NOTICE 'Continuous aggregate view run_stats_monthly already exists';
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Error creating continuous aggregate run_stats_monthly: %', SQLERRM;
+END $$;
 
 -- =====================================================
 -- 5. 创建触发器和函数
@@ -437,35 +515,7 @@ FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
 -- =====================================================
--- 7. 数据压缩策略 (可选)
--- =====================================================
-
--- 7.1 配置 runs 表压缩
--- 注意: 根据实际需求决定是否启用压缩
--- ALTER TABLE runs SET (
---     timescaledb.compress,
---     timescaledb.compress_segmentby = 'system,model_name',
---     timescaledb.compress_orderby = 'start_time DESC'
--- );
-
--- 7.2 添加压缩策略 (压缩 7 天前的数据)
--- SELECT add_compression_policy('runs',
---     INTERVAL '7 days',
---     compress_after => INTERVAL '30 days',
---     if_not_exists => TRUE
--- );
-
--- =====================================================
--- 8. 数据保留策略 (可选)
--- =====================================================
-
--- 根据需求配置数据保留策略
--- 例如: 保留 90 天的数据
--- SELECT add_retention_policy('runs', INTERVAL '90 days');
--- SELECT add_retention_policy('run_stats_raw', INTERVAL '90 days');
-
--- =====================================================
--- 9. 验证初始化
+-- 7. 验证初始化
 -- =====================================================
 
 -- 显示所有创建的表

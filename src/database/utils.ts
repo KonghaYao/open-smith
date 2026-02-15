@@ -1,10 +1,17 @@
 import { v4 as uuidv4 } from "uuid";
 
-export const formatTimestamp = (time: string | void) => {
-    if (time) {
-        return new Date(time).getTime().toFixed(0);
+export const formatTimestamp = (time: string | void): string | undefined => {
+    if (!time) {
+        return undefined;
     }
-    return;
+
+    const date = new Date(time);
+    if (isNaN(date.getTime())) {
+        console.warn(`Invalid timestamp: ${time}`);
+        return undefined;
+    }
+
+    return date.toISOString();
 };
 
 // 生成API密钥的辅助方法

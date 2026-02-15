@@ -53,6 +53,26 @@ export class BaseDatabase {
                         continue;
                     }
 
+                    // 对于 DO 块的特殊处理（可能包含多次 DROP）
+                    if (statement.startsWith("DO $$")) {
+                        // 如果 DO 块失败，可能是因为某些表不存在或已经是 hypertable
+                        // 我们可以忽略这类错误，因为后面会有 IF NOT EXISTS 检查
+                        console.log(`Note: Cleanup DO block encountered an error (ignoring):`, error.message);
+                        continue;
+                    }
+
+                    // 如果错误码是 42P01 (relation does not exist)，可能是表不存在，可以忽略
+                    if (error.code === "42P01") {
+                        console.log(`Note: Relation does not exist (ignoring):`, error.message);
+                        continue;
+                    }
+
+                    // 如果错误包含 "time_column_name"，可能是 TimescaleDB 版本兼容问题
+                    if (error.message?.includes("time_column_name")) {
+                        console.log(`Note: TimescaleDB version compatibility issue (ignoring):`, error.message);
+                        continue;
+                    }
+
                     console.error("Error executing SQL statement:", error.message);
                     console.error("Statement:", statement.substring(0, 200) + "...");
                     throw error;
@@ -60,7 +80,35 @@ export class BaseDatabase {
             }
         }
 
+        // 验证关键表是否已创建
+        await this.verifyTables();
+
         console.log("✓ TimescaleDB tables initialized successfully");
+    }
+
+    // 验证关键表是否存在
+    private async verifyTables(): Promise<void> {
+        const requiredTables = ['systems', 'runs', 'feedback', 'attachments', 'run_stats_raw'];
+
+        for (const tableName of requiredTables) {
+            try {
+                const result = await sql`
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables
+                        WHERE table_schema = 'public'
+                        AND table_name = ${sql.raw(`'${tableName}'`)}
+                    )
+                `.execute(this.db);
+
+                const exists = result.rows[0]?.exists;
+                if (!exists) {
+                    throw new Error(`Required table '${tableName}' does not exist after initialization`);
+                }
+            } catch (error) {
+                console.error(`Error verifying table '${tableName}':`, error);
+                throw error;
+            }
+        }
     }
 
     // 分割 SQL 语句

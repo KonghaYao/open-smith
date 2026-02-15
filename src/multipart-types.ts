@@ -98,8 +98,20 @@ export class MultipartParser {
     parsePartName(partName: string): ParsedMultipartEntry | null {
         const patterns = this.config.multipart_patterns;
 
+        // 先检查 run_field 模式（更具体的模式应该先匹配）
+        // 因为 post.xxx 和 post.xxx.field 都以 post 开头，需要优先匹配更长的模式
+        let match = partName.match(patterns.run_field);
+        if (match) {
+            return {
+                event: match[1] as MultipartEvent,
+                runId: match[2],
+                field: match[3],
+                data: "",
+            };
+        }
+
         // 检查 run_create 模式
-        let match = partName.match(patterns.run_create);
+        match = partName.match(patterns.run_create);
         if (match) {
             return {
                 event: "post",
@@ -114,17 +126,6 @@ export class MultipartParser {
             return {
                 event: "patch",
                 runId: match[1],
-                data: "",
-            };
-        }
-
-        // 检查 run_field 模式
-        match = partName.match(patterns.run_field);
-        if (match) {
-            return {
-                event: match[1] as MultipartEvent,
-                runId: match[2],
-                field: match[3],
                 data: "",
             };
         }
