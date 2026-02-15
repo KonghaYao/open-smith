@@ -16,6 +16,7 @@ import {
 } from "lucide-solid";
 
 // Token 定价模型（示例，可根据实际情况调整）
+// 单位：USD per 1M tokens
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
     "gpt-4o": { input: 2.5, output: 10 },
     "gpt-4o-mini": { input: 0.15, output: 0.6 },
@@ -25,7 +26,11 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
     "claude-3-sonnet": { input: 3, output: 15 },
     "claude-3-haiku": { input: 0.25, output: 1.25 },
     "claude-3.5-sonnet": { input: 3, output: 15 },
+    "mimo-v2-flash": { input: 0.1, output: 0.2 },
 };
+
+// 默认价格（每 1M tokens）
+const DEFAULT_PRICING = { input: 0.002, output: 0.005 };
 
 const timeRanges = [
     { label: "最近1天", value: "1d" },
@@ -162,8 +167,8 @@ const CostAnalysis = (): JSX.Element => {
     const totalCost = createMemo(() => {
         const data = totalCostData()?.data || [];
         return data.reduce((sum, d) => {
-            const tokens = d.metrics.total_tokens_sum || 0;
-            // 假设平均价格：$0.002/1K tokens
+            const tokens = Number(d.metrics.total_tokens_sum || 0);
+            // 使用默认价格：$0.002/1K tokens
             return sum + (tokens * 0.002) / 1000;
         }, 0);
     });
@@ -187,7 +192,7 @@ const CostAnalysis = (): JSX.Element => {
 
         const labels = data.map((d) => new Date(d.time).toLocaleDateString());
         const costs = data.map((d) => {
-            const tokens = d.metrics.total_tokens_sum || 0;
+            const tokens = Number(d.metrics.total_tokens_sum || 0);
             return (tokens * 0.002) / 1000;
         });
 
@@ -216,7 +221,7 @@ const CostAnalysis = (): JSX.Element => {
             tooltip: {
                 callbacks: {
                     label: (context: any) => {
-                        return `$${context.raw.toFixed(2)}`;
+                        return `$${context.raw?.toFixed(6) || '0.000000'}`;
                     },
                 },
             },
@@ -235,7 +240,7 @@ const CostAnalysis = (): JSX.Element => {
                 },
                 beginAtZero: true,
                 ticks: {
-                    callback: (value: any) => `$${value.toFixed(2)}`,
+                    callback: (value: any) => `$${value.toFixed(6)}`,
                 },
             },
         },
@@ -245,20 +250,30 @@ const CostAnalysis = (): JSX.Element => {
     const modelCostChartData = createMemo(() => {
         const data = modelCostData()?.data || [];
 
-        // 按模型汇总成本
+        // 按模型汇总成本，过滤掉模型名称为 null 的记录
         const modelCosts = new Map<string, number>();
         data.forEach((d) => {
-            const modelName = d.dimensions?.model_name || "未知模型";
-            const tokens = d.metrics.total_tokens_sum || 0;
-            const pricing = MODEL_PRICING[modelName] || { input: 0.002, output: 0.005 };
+            const modelName = d.dimensions?.model_name;
+            // 跳过模型名称为 null 的记录
+            if (!modelName) return;
+
+            const tokens = Number(d.metrics.total_tokens_sum || 0);
+            const pricing = MODEL_PRICING[modelName] || DEFAULT_PRICING;
             const avgPrice = (pricing.input + pricing.output) / 2;
             const cost = (tokens * avgPrice) / 1000000; // Convert to USD
 
             modelCosts.set(modelName, (modelCosts.get(modelName) || 0) + cost);
         });
 
-        const labels = Array.from(modelCosts.keys());
-        const costs = labels.map((model) => modelCosts.get(model) || 0);
+        // 只显示有成本的模型
+        const entries = Array.from(modelCosts.entries()).filter(([_, cost]) => cost > 0);
+
+        if (entries.length === 0) {
+            return { labels: ["暂无数据"], datasets: [{ label: "成本 (USD)", data: [0], backgroundColor: ["rgb(200, 200, 200)"] }] };
+        }
+
+        const labels = entries.map(([model]) => model);
+        const costs = entries.map(([_, cost]) => cost);
 
         const colors = [
             "rgb(59, 130, 246)",
@@ -294,8 +309,8 @@ const CostAnalysis = (): JSX.Element => {
                 callbacks: {
                     label: (context: any) => {
                         const total = context.dataset.data.reduce((sum: number, val: number) => sum + val, 0);
-                        const percentage = ((context.raw / total) * 100).toFixed(1);
-                        return `${context.label}: $${context.raw.toFixed(2)} (${percentage}%)`;
+                        const percentage = total > 0 ? ((context.raw / total) * 100).toFixed(1) : "0.0";
+                        return `${context.label}: $${context.raw?.toFixed(6) || '0.000000'} (${percentage}%)`;
                     },
                 },
             },
@@ -304,14 +319,14 @@ const CostAnalysis = (): JSX.Element => {
 
     // 按系统成本排行表格
     const systemCostTable = createMemo(() => {
-        const data = systemCostData()?.data || [];
+        const data = systemCostData?.()?.data || [];
 
         // 按系统汇总成本
         const systemCosts = new Map<string, { cost: number; runs: number }>();
         data.forEach((d) => {
             const systemName = d.dimensions?.system || "未知系统";
-            const tokens = d.metrics.total_tokens_sum || 0;
-            const runs = d.metrics.total_runs || 0;
+            const tokens = Number(d.metrics.total_tokens_sum || 0);
+            const runs = Number(d.metrics.total_runs || 0);
             const cost = (tokens * 0.002) / 1000;
 
             const existing = systemCosts.get(systemName) || { cost: 0, runs: 0 };
@@ -330,6 +345,16 @@ const CostAnalysis = (): JSX.Element => {
                 avgCostPerRun: stats.runs > 0 ? stats.cost / stats.runs : 0,
             }))
             .sort((a, b) => b.cost - a.cost);
+    });
+
+    // 计算活跃模型数
+    const activeModelCount = createMemo(() => {
+        const data = modelCostData?.()?.data || [];
+        return new Set(
+            data
+                .map(d => d.dimensions?.model_name)
+                .filter(m => m !== null && m !== undefined)
+        ).size;
     });
 
     return (
@@ -368,25 +393,25 @@ const CostAnalysis = (): JSX.Element => {
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <CostCard
                         title="总成本"
-                        value={`$${totalCost().toFixed(2)}`}
+                        value={`$${totalCost().toFixed(6)}`}
                         icon={DollarSign}
                         color="bg-blue-500"
                     />
                     <CostCard
                         title="日均成本"
-                        value={`$${dailyAverageCost().toFixed(2)}`}
+                        value={`$${dailyAverageCost().toFixed(6)}`}
                         icon={Calendar}
                         color="bg-green-500"
                     />
                     <CostCard
                         title="预计月度成本"
-                        value={`$${estimatedMonthlyCost().toFixed(2)}`}
+                        value={`$${estimatedMonthlyCost().toFixed(6)}`}
                         icon={TrendingUp}
                         color="bg-orange-500"
                     />
                     <CostCard
                         title="活跃模型数"
-                        value={new Set(modelCostData()?.data?.map(d => d.dimensions?.model_name)).size}
+                        value={activeModelCount()}
                         icon={PieChart}
                         color="bg-purple-500"
                     />
@@ -436,13 +461,13 @@ const CostAnalysis = (): JSX.Element => {
                                             <tr class="border-b border-gray-100">
                                                 <td class="px-4 py-2 text-gray-900">{item.system}</td>
                                                 <td class="px-4 py-2 text-right text-gray-900">
-                                                    ${item.cost.toFixed(2)}
+                                                    ${item.cost.toFixed(6)}
                                                 </td>
                                                 <td class="px-4 py-2 text-right text-gray-600">
                                                     {item.runs.toLocaleString()}
                                                 </td>
                                                 <td class="px-4 py-2 text-right text-gray-600">
-                                                    ${item.avgCostPerRun.toFixed(4)}
+                                                    ${item.avgCostPerRun.toFixed(8)}
                                                 </td>
                                             </tr>
                                         )}

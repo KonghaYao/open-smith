@@ -441,16 +441,18 @@ const StatsPage = (): JSX.Element => {
             return { labels: [], datasets: [] };
         }
 
+        // 提取所有唯一的时间点作为标签
+        const uniqueTimes = Array.from(
+            new Set(data.map((d) => d.time))
+        ).sort();
+
         // 按模型分组数据
-        const dataByModel = new Map<
-            string,
-            Array<{ time: string; value: number }>
-        >();
+        const dataByModel = new Map<string, Map<string, number>>();
 
         data.forEach((d) => {
             const modelName = d.dimensions?.model_name || "未知模型";
             if (!dataByModel.has(modelName)) {
-                dataByModel.set(modelName, []);
+                dataByModel.set(modelName, new Map());
             }
             let value = d.metrics[metric] as number;
             if (metric === "error_rate") {
@@ -463,16 +465,18 @@ const StatsPage = (): JSX.Element => {
             } else if (metric.includes("tokens")) {
                 value = value ? value / 1000 : 0;
             }
-            dataByModel.get(modelName)!.push({ time: d.time, value });
+            dataByModel.get(modelName)!.set(d.time, value);
         });
 
+        // 为每个模型创建数据集，确保数据点数量与标签数量一致
         const datasets: any[] = [];
         let index = 0;
         dataByModel.forEach((modelData, modelName) => {
             const color = modelColors[index % modelColors.length];
+            const values = uniqueTimes.map((time) => modelData.get(time) ?? null);
             datasets.push({
                 label: modelName,
-                data: modelData.map((d) => d.value),
+                data: values,
                 borderColor: color,
                 backgroundColor: color
                     .replace("rgb", "rgba")
@@ -483,7 +487,7 @@ const StatsPage = (): JSX.Element => {
         });
 
         return {
-            labels: data.map((d) => new Date(d.time).toLocaleString()),
+            labels: uniqueTimes.map((time) => new Date(time).toLocaleString()),
             datasets,
         };
     });

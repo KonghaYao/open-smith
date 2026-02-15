@@ -161,7 +161,10 @@ const analyticsBaseUrl = "/api/v1/analytics";
 export async function getTimeseries(query: TimeseriesQuery): Promise<TimeseriesResponse> {
     const params = new URLSearchParams();
 
-    if (query.dimension) params.append("dimension", query.dimension);
+    // Only add dimension if it has a truthy value (avoid undefined being converted to string)
+    if (query.dimension) {
+        params.append("dimension", query.dimension);
+    }
     params.append("metrics", query.metrics.join(","));
     params.append("granularity", query.granularity);
     if (query.start_time) params.append("start_time", query.start_time);
