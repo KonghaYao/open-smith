@@ -21,7 +21,7 @@ export const generateApiKey = (): string => {
 
 // 从 outputs 字段中提取 total_tokens 的辅助方法
 export const extractTotalTokensFromOutputs = (
-    outputs?: string | object
+    outputs?: string | object,
 ): number => {
     if (!outputs) return 0;
     try {
@@ -54,7 +54,7 @@ export const extractTotalTokensFromOutputs = (
 
 // 从 events 字段中提取 time_to_first_token 的辅助方法
 export const extractTimeToFirstTokenFromEvents = (
-    events?: string | object
+    events?: string | object,
 ): number => {
     if (!events) return 0;
     try {
@@ -73,7 +73,7 @@ export const extractTimeToFirstTokenFromEvents = (
 
 // 从 outputs 字段中提取 model_name 的辅助方法
 export const extractModelNameFromOutputs = (
-    outputs?: string | object
+    outputs?: string | object,
 ): string | undefined => {
     if (!outputs) return undefined;
     try {

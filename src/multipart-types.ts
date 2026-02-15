@@ -25,12 +25,12 @@ export interface RunPayload {
     thread_id?: string; // 线程ID，来自 extra.metadata.thread_id
     start_time?: string;
     end_time?: string;
-    inputs?: Record<string, unknown> | string; // 可以是任何类型，例如对象
-    outputs?: Record<string, unknown> | string; // 可以是任何类型，例如对象
-    events?: Record<string, unknown> | string; // 可以是任何类型
-    error?: Record<string, unknown> | string; // 可以是任何类型
-    extra?: Record<string, unknown> | string; // 可以是任何类型
-    serialized?: Record<string, unknown> | string; // 可以是任何类型
+    inputs?: Record<string, unknown>; // 可以是任何类型，例如对象
+    outputs?: Record<string, unknown>; // 可以是任何类型，例如对象
+    events?: { name: string; time: string }[]; // 可以是任何类型
+    error?: Record<string, unknown>; // 可以是任何类型
+    extra?: Record<string, unknown>; // 可以是任何类型
+    serialized?: Record<string, unknown>; // 可以是任何类型
     total_tokens?: number; // 新增字段：总 token 数
 }
 

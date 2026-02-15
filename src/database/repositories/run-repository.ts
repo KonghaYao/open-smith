@@ -134,12 +134,15 @@ export class RunRepository {
                 updateData.end_time = new Date(endTime);
             }
         }
-        if (runData.inputs !== undefined) {
-            updateData.inputs = JSON.stringify(runData.inputs);
+
+        if (runData.outputs) {
+            updateData.outputs = JSON.stringify(runData.outputs);
             updateData.total_tokens = extractTotalTokensFromOutputs(
-                runData.inputs,
+                runData.outputs,
             );
-            updateData.model_name = extractModelNameFromOutputs(runData.inputs);
+            updateData.model_name = extractModelNameFromOutputs(
+                runData.outputs,
+            );
         } else if (runData.total_tokens !== undefined) {
             updateData.total_tokens = runData.total_tokens;
         }
@@ -218,10 +221,68 @@ export class RunRepository {
             updated_at: now,
         };
 
-        if (json && value !== null && value !== undefined) {
-            updateData[field] = JSON.stringify(value);
-        } else {
-            updateData[field] = value;
+        // 根据不同的字段类型，进行智能处理（与 updateRun 一致）
+        switch (field) {
+            case "start_time":
+                const startTime = formatTimestamp(value);
+                if (startTime) {
+                    updateData.start_time = new Date(startTime);
+                }
+                break;
+
+            case "end_time":
+                const endTime = formatTimestamp(value);
+                if (endTime) {
+                    updateData.end_time = new Date(endTime);
+                }
+                break;
+
+            case "outputs":
+                if (json && value !== null && value !== undefined) {
+                    updateData.outputs = JSON.stringify(value);
+                } else {
+                    updateData.outputs = value;
+                }
+                // 自动提取并更新 total_tokens 和 model_name
+                updateData.total_tokens = extractTotalTokensFromOutputs(value);
+                updateData.model_name = extractModelNameFromOutputs(value);
+                break;
+
+            case "events":
+                if (json && value !== null && value !== undefined) {
+                    updateData.events = JSON.stringify(value);
+                } else {
+                    updateData.events = value;
+                }
+                // 自动提取并更新 time_to_first_token
+                updateData.time_to_first_token = extractTimeToFirstTokenFromEvents(value);
+                break;
+
+            case "extra":
+                if (json && value !== null && value !== undefined) {
+                    updateData.extra = JSON.stringify(value);
+                } else {
+                    updateData.extra = value;
+                }
+                // 自动提取并更新 thread_id 和 user_id
+                const threadId = extractThreadIdFromExtra(value);
+                if (threadId) {
+                    updateData.thread_id = threadId;
+                }
+                const userId = extractUserIdFromExtra(value);
+                if (userId) {
+                    updateData.user_id = userId;
+                }
+                break;
+
+            default:
+                // 对于其他字段，使用默认的 JSON 处理逻辑
+                if (json && value !== null && value !== undefined) {
+                    updateData[field] = JSON.stringify(value);
+                } else {
+                    updateData[field] = value;
+                }
+                break;
         }
 
         const result = await this.db
@@ -323,13 +384,13 @@ export class RunRepository {
         return runs.map((run) => ({
             ...run,
             // 将 JSON 字符串解析为对象
-            inputs: run.inputs ? JSON.parse(run.inputs) : undefined,
-            outputs: run.outputs ? JSON.parse(run.outputs) : undefined,
-            events: run.events ? JSON.parse(run.events) : undefined,
-            error: run.error ? JSON.parse(run.error) : undefined,
-            extra: run.extra ? JSON.parse(run.extra) : undefined,
-            serialized: run.serialized ? JSON.parse(run.serialized) : undefined,
-            tags: run.tags ? JSON.parse(run.tags) : undefined,
+            inputs: run.inputs ? run.inputs : undefined,
+            outputs: run.outputs ? run.outputs : undefined,
+            events: run.events ? run.events : undefined,
+            error: run.error ? run.error : undefined,
+            extra: run.extra ? run.extra : undefined,
+            serialized: run.serialized ? run.serialized : undefined,
+            tags: run.tags ? run.tags : undefined,
             feedback_count: run.feedback_count || 0,
             attachments_count: run.attachments_count || 0,
             feedback: [],
@@ -385,13 +446,13 @@ export class RunRepository {
         return runs.map((run) => ({
             ...run,
             // 将 JSON 字符串解析为对象
-            inputs: run.inputs ? JSON.parse(run.inputs) : undefined,
-            outputs: run.outputs ? JSON.parse(run.outputs) : undefined,
-            events: run.events ? JSON.parse(run.events) : undefined,
-            error: run.error ? JSON.parse(run.error) : undefined,
-            extra: run.extra ? JSON.parse(run.extra) : undefined,
-            serialized: run.serialized ? JSON.parse(run.serialized) : undefined,
-            tags: run.tags ? JSON.parse(run.tags) : undefined,
+            inputs: run.inputs ? run.inputs : undefined,
+            outputs: run.outputs ? run.outputs : undefined,
+            events: run.events ? run.events : undefined,
+            error: run.error ? run.error : undefined,
+            extra: run.extra ? run.extra : undefined,
+            serialized: run.serialized ? run.serialized : undefined,
+            tags: run.tags ? run.tags : undefined,
             feedback_count: run.feedback_count || 0,
             attachments_count: run.attachments_count || 0,
             feedback: [],
@@ -411,13 +472,13 @@ export class RunRepository {
         return runs.map((run) => ({
             ...run,
             // 将 JSON 字符串解析为对象
-            inputs: run.inputs ? JSON.parse(run.inputs) : undefined,
-            outputs: run.outputs ? JSON.parse(run.outputs) : undefined,
-            events: run.events ? JSON.parse(run.events) : undefined,
-            error: run.error ? JSON.parse(run.error) : undefined,
-            extra: run.extra ? JSON.parse(run.extra) : undefined,
-            serialized: run.serialized ? JSON.parse(run.serialized) : undefined,
-            tags: run.tags ? JSON.parse(run.tags) : undefined,
+            inputs: run.inputs ? run.inputs : undefined,
+            outputs: run.outputs ? run.outputs : undefined,
+            events: run.events ? run.events : undefined,
+            error: run.error ? run.error : undefined,
+            extra: run.extra ? run.extra : undefined,
+            serialized: run.serialized ? run.serialized : undefined,
+            tags: run.tags ? run.tags : undefined,
             feedback_count: run.feedback_count || 0,
             attachments_count: run.attachments_count || 0,
             feedback: [],
@@ -437,13 +498,13 @@ export class RunRepository {
         return runs.map((run) => ({
             ...run,
             // 将 JSON 字符串解析为对象
-            inputs: run.inputs ? JSON.parse(run.inputs) : undefined,
-            outputs: run.outputs ? JSON.parse(run.outputs) : undefined,
-            events: run.events ? JSON.parse(run.events) : undefined,
-            error: run.error ? JSON.parse(run.error) : undefined,
-            extra: run.extra ? JSON.parse(run.extra) : undefined,
-            serialized: run.serialized ? JSON.parse(run.serialized) : undefined,
-            tags: run.tags ? JSON.parse(run.tags) : undefined,
+            inputs: run.inputs ? run.inputs : undefined,
+            outputs: run.outputs ? run.outputs : undefined,
+            events: run.events ? run.events : undefined,
+            error: run.error ? run.error : undefined,
+            extra: run.extra ? run.extra : undefined,
+            serialized: run.serialized ? run.serialized : undefined,
+            tags: run.tags ? run.tags : undefined,
             feedback_count: run.feedback_count || 0,
             attachments_count: run.attachments_count || 0,
             feedback: [],
@@ -469,13 +530,13 @@ export class RunRepository {
         return runs.map((run) => ({
             ...run,
             // 将 JSON 字符串解析为对象
-            inputs: run.inputs ? JSON.parse(run.inputs) : undefined,
-            outputs: run.outputs ? JSON.parse(run.outputs) : undefined,
-            events: run.events ? JSON.parse(run.events) : undefined,
-            error: run.error ? JSON.parse(run.error) : undefined,
-            extra: run.extra ? JSON.parse(run.extra) : undefined,
-            serialized: run.serialized ? JSON.parse(run.serialized) : undefined,
-            tags: run.tags ? JSON.parse(run.tags) : undefined,
+            inputs: run.inputs ? run.inputs : undefined,
+            outputs: run.outputs ? run.outputs : undefined,
+            events: run.events ? run.events : undefined,
+            error: run.error ? run.error : undefined,
+            extra: run.extra ? run.extra : undefined,
+            serialized: run.serialized ? run.serialized : undefined,
+            tags: run.tags ? run.tags : undefined,
             feedback_count: run.feedback_count || 0,
             attachments_count: run.attachments_count || 0,
             feedback: [],
@@ -554,13 +615,13 @@ export class RunRepository {
         return runs.map((run) => ({
             ...run,
             // 将 JSON 字符串解析为对象
-            inputs: run.inputs ? JSON.parse(run.inputs) : undefined,
-            outputs: run.outputs ? JSON.parse(run.outputs) : undefined,
-            events: run.events ? JSON.parse(run.events) : undefined,
-            error: run.error ? JSON.parse(run.error) : undefined,
-            extra: run.extra ? JSON.parse(run.extra) : undefined,
-            serialized: run.serialized ? JSON.parse(run.serialized) : undefined,
-            tags: run.tags ? JSON.parse(run.tags) : undefined,
+            inputs: run.inputs ? run.inputs : undefined,
+            outputs: run.outputs ? run.outputs : undefined,
+            events: run.events ? run.events : undefined,
+            error: run.error ? run.error : undefined,
+            extra: run.extra ? run.extra : undefined,
+            serialized: run.serialized ? run.serialized : undefined,
+            tags: run.tags ? run.tags : undefined,
             feedback_count: run.feedback_count || 0,
             attachments_count: run.attachments_count || 0,
             feedback: [],
