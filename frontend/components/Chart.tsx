@@ -6,7 +6,31 @@ import {
     type ChartTypeRegistry,
 } from "chart.js";
 import type { Component } from "solid-js";
-import { merge as deepMerge } from "lodash-es/merge";
+
+// 简单的深合并函数
+function deepMerge(target: any, source: any): any {
+    if (typeof target !== "object" || typeof source !== "object") {
+        return source;
+    }
+
+    const output = { ...target };
+
+    for (const key in source) {
+        if (source.hasOwnProperty(key)) {
+            if (
+                typeof source[key] === "object" &&
+                source[key] !== null &&
+                !Array.isArray(source[key])
+            ) {
+                output[key] = deepMerge(target[key] || {}, source[key]);
+            } else {
+                output[key] = source[key];
+            }
+        }
+    }
+
+    return output;
+}
 
 interface BaseChartProps {
     type: keyof ChartTypeRegistry;

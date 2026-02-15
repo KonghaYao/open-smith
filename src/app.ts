@@ -57,7 +57,7 @@ app.route("/stats", statsRouter);
 
 // 创建并挂载 analytics 路由器
 const analyticsRouter = createAnalyticsRouter(kysely);
-app.route("/api/v1/analytics", analyticsRouter);
+app.route("/v1/analytics", analyticsRouter);
 
 app.use(logger());
 

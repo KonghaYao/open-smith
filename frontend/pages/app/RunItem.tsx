@@ -85,14 +85,10 @@ export const calcTpsFromRun = (run: RunRecord) => {
     const data = run.outputs;
     console.log(run);
     if (!data) return 0;
-    const totalTokens = data.generations
-        .flat()
-        .map((i: any) => i.message)
-        .reduce((acc: number, cur: any) => {
-            return acc + (cur?.kwargs?.usage_metadata?.output_tokens || 0);
-        }, 0);
+    const totalTokens = run.outputs?.llmOutput?.tokenUsage?.completionTokens;
     /** @ts-ignore */
-    const duration = run.end_time - run.start_time;
+    const duration =
+        new Date(run.end_time).getTime() - new Date(run.start_time).getTime();
     return (totalTokens / duration) * 1000;
 };
 

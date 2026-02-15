@@ -156,11 +156,11 @@ export interface SummaryResponse {
 // Analytics API Functions
 // ========================================
 
-const analyticsBaseUrl = "/api/v1/analytics";
+const analyticsBaseUrl = "/v1/analytics";
 
 export async function getTimeseries(query: TimeseriesQuery): Promise<TimeseriesResponse> {
     const params = new URLSearchParams();
-    
+
     if (query.dimension) params.append("dimension", query.dimension);
     params.append("metrics", query.metrics.join(","));
     params.append("granularity", query.granularity);
@@ -176,7 +176,7 @@ export async function getTimeseries(query: TimeseriesQuery): Promise<TimeseriesR
 
 export async function getTrends(query: TrendQuery): Promise<TrendResponse> {
     const params = new URLSearchParams();
-    
+
     params.append("metric", query.metric);
     params.append("period", query.period);
     if (query.start_time) params.append("start_time", query.start_time);
@@ -189,7 +189,7 @@ export async function getTrends(query: TrendQuery): Promise<TrendResponse> {
 
 export async function getComparison(query: CompareQuery): Promise<CompareResponse> {
     const params = new URLSearchParams();
-    
+
     params.append("compare_by", query.compare_by);
     params.append("metrics", query.metrics.join(","));
     params.append("start_time_1", query.start_time_1);
@@ -204,7 +204,7 @@ export async function getComparison(query: CompareQuery): Promise<CompareRespons
 
 export async function getAnomalies(query: AnomalyQuery): Promise<AnomalyResponse> {
     const params = new URLSearchParams();
-    
+
     params.append("metric", query.metric);
     params.append("start_time", query.start_time);
     params.append("end_time", query.end_time);
@@ -217,7 +217,7 @@ export async function getAnomalies(query: AnomalyQuery): Promise<AnomalyResponse
 
 export async function getSummary(query: SummaryQuery = {}): Promise<SummaryResponse> {
     const params = new URLSearchParams();
-    
+
     if (query.start_time) params.append("start_time", query.start_time);
     if (query.end_time) params.append("end_time", query.end_time);
     if (query.filters) params.append("filters", JSON.stringify(query.filters));

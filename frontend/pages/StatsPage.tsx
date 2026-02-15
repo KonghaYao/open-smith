@@ -10,7 +10,7 @@ import {
     type TimeseriesQuery,
     type TimeseriesResponse,
 } from "../api";
-import { Chart as ChartJS } from "chart.js";
+import Chart from "../components/Chart.js";
 import { BarChart3, TrendingUp } from "lucide-solid";
 
 const sevenDaysAgo = (): Date => {
@@ -170,7 +170,7 @@ const StatsPage = (): JSX.Element => {
                     "p95_duration_ms",
                     "p99_duration_ms",
                     "total_tokens",
-                    "avg_tokens",
+                    "avg_tokens_per_run",
                     "avg_ttft_ms",
                     "distinct_users",
                 ],
@@ -207,7 +207,7 @@ const StatsPage = (): JSX.Element => {
                     "p95_duration_ms",
                     "p99_duration_ms",
                     "total_tokens",
-                    "avg_tokens",
+                    "avg_tokens_per_run",
                     "avg_ttft_ms",
                 ],
                 granularity: "1h",
@@ -269,6 +269,7 @@ const StatsPage = (): JSX.Element => {
         { value: "p95_ttft_ms", label: "P95 首包时间 (s)", yAxisId: "y3" },
         { value: "total_tokens", label: "总 Token 数 (k)", yAxisId: "y4" },
         { value: "avg_tokens", label: "平均 Token 数 (k)", yAxisId: "y4" },
+        { value: "avg_tokens_per_run", label: "平均 Token 数 (k)", yAxisId: "y4" },
         { value: "distinct_users", label: "独立用户数", yAxisId: "y" },
     ];
 
@@ -315,14 +316,14 @@ const StatsPage = (): JSX.Element => {
             const values = data.map((d) => {
                 let value = d.metrics[metric] as number;
                 if (metric === "error_rate") {
-                    value *= 100;
+                    value = value ? value * 100 : 0;
                 } else if (
                     metric.includes("duration_ms") ||
                     metric.includes("ttft_ms")
                 ) {
-                    value /= 1000; // Convert ms to s
+                    value = value ? value / 1000 : 0; // Convert ms to s
                 } else if (metric.includes("tokens")) {
-                    value /= 1000; // Convert tokens to k
+                    value = value ? value / 1000 : 0; // Convert tokens to k
                 }
                 return value;
             });
@@ -430,14 +431,14 @@ const StatsPage = (): JSX.Element => {
             }
             let value = d.metrics[metric] as number;
             if (metric === "error_rate") {
-                value *= 100;
+                value = value ? value * 100 : 0;
             } else if (
                 metric.includes("duration_ms") ||
                 metric.includes("ttft_ms")
             ) {
-                value /= 1000;
+                value = value ? value / 1000 : 0;
             } else if (metric.includes("tokens")) {
-                value /= 1000;
+                value = value ? value / 1000 : 0;
             }
             dataByModel.get(modelName)!.push({ time: d.time, value });
         });
@@ -679,6 +680,9 @@ const StatsPage = (): JSX.Element => {
                                 <option value="avg_tokens">
                                     平均 Token 数
                                 </option>
+                                <option value="avg_tokens_per_run">
+                                    平均 Token 数
+                                </option>
                             </select>
                         </div>
                         {modelTimeseriesData.loading ? (
@@ -740,22 +744,22 @@ const StatsPage = (): JSX.Element => {
                                                     {new Date(item.time).toLocaleString()}
                                                 </td>
                                                 <td class="px-4 py-2 text-gray-900">
-                                                    {item.metrics.total_runs?.toLocaleString() || 0}
+                                                    {(item.metrics.total_runs || 0).toLocaleString()}
                                                 </td>
                                                 <td class="px-4 py-2 text-gray-600">
-                                                    {item.metrics.successful_runs?.toLocaleString() || 0} / {item.metrics.failed_runs?.toLocaleString() || 0}
+                                                    {(item.metrics.successful_runs || 0).toLocaleString()} / {(item.metrics.failed_runs || 0).toLocaleString()}
                                                 </td>
                                                 <td class="px-4 py-2 text-gray-900">
-                                                    {(item.metrics.error_rate || 0 * 100).toFixed(2)}%
+                                                    {((item.metrics.error_rate || 0) * 100).toFixed(2)}%
                                                 </td>
                                                 <td class="px-4 py-2 text-gray-900">
                                                     {((item.metrics.avg_duration_ms || 0) / 1000).toFixed(2)}s
                                                 </td>
                                                 <td class="px-4 py-2 text-gray-900">
-                                                    {((item.metrics.total_tokens || 0) / 1000).toFixed(1)}k
+                                                    {((item.metrics.total_tokens_sum || 0) / 1000).toFixed(1)}k
                                                 </td>
                                                 <td class="px-4 py-2 text-gray-900">
-                                                    {item.metrics.distinct_users?.toLocaleString() || 0}
+                                                    {(item.metrics.distinct_users || 0).toLocaleString()}
                                                 </td>
                                             </tr>
                                         )}
