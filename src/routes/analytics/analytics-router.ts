@@ -161,7 +161,8 @@ export function createAnalyticsRouter(db: Kysely<Database>) {
             // 构建指标聚合表达式
             const metricClauses: string[] = validMetrics.map(metric => {
                 // 如果有维度分组，需要 SUM；否则直接选择
-                return hasDimension ? `SUM(${metric}) as ${metric}` : metric;
+                // 添加 ::NUMERIC 类型转换确保返回的是数字类型
+                return hasDimension ? `SUM(${metric})::NUMERIC as ${metric}` : `${metric}::NUMERIC as ${metric}`;
             });
 
             const metricSelect = metricClauses.join(", ");
@@ -217,7 +218,17 @@ export function createAnalyticsRouter(db: Kysely<Database>) {
                 query.metrics.forEach(metric => {
                     if (metric !== "") {
                         const dbColumn = METRIC_MAP[metric] || metric;
-                        item.metrics[metric] = row[dbColumn] ?? null;
+                        const value = row[dbColumn];
+
+                        // 将数据库的字符串值转换为数字类型
+                        // 处理 null、undefined、空字符串，以及各种可能的字符串格式
+                        if (value === null || value === undefined || value === "") {
+                            item.metrics[metric] = null;
+                        } else {
+                            // 转换为数字，如果是无效数字则返回 0
+                            const num = Number(value);
+                            item.metrics[metric] = isNaN(num) ? 0 : num;
+                        }
                     }
                 });
 

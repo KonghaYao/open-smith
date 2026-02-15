@@ -183,7 +183,9 @@ const StatsPage = (): JSX.Element => {
                 limit: 1000,
             };
 
+            console.log("Fetching timeseries data with query:", query);
             const response = await getTimeseries(query);
+            console.log("Timeseries response:", response);
             return response;
         } catch (err) {
             console.error("Failed to fetch timeseries data", err);
@@ -325,7 +327,11 @@ const StatsPage = (): JSX.Element => {
         const data = timeseriesData()?.data || [];
         const metrics = selectedMetrics();
 
+        console.log("chartData - data:", data);
+        console.log("chartData - metrics:", metrics);
+
         if (!data.length || !metrics.length) {
+            console.log("chartData - returning empty");
             return { labels: [], datasets: [] };
         }
 
@@ -360,10 +366,13 @@ const StatsPage = (): JSX.Element => {
             };
         });
 
-        return {
+        const result = {
             labels,
             datasets,
         };
+
+        console.log("chartData - result:", result);
+        return result;
     });
 
     const chartOptions = createMemo(() => {

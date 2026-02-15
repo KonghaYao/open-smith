@@ -123,6 +123,7 @@ const Chart: Component<BaseChartProps> = (props) => {
     // 响应式更新
     createMemo(() => {
         if (chartInstance && props.data) {
+            console.log('Chart component - updating data:', props.data);
             chartInstance.data = props.data;
             if (props.options) {
                 chartInstance.options = deepMerge(
@@ -130,6 +131,7 @@ const Chart: Component<BaseChartProps> = (props) => {
                     props.options,
                 );
             }
+            console.log('Chart component - calling update()');
             chartInstance.update();
         }
     });

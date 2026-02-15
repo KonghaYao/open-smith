@@ -6,7 +6,6 @@ import {
     createMemo,
 } from "solid-js";
 import { getTimeseries, getSummary, type TimeseriesQuery, type SummaryResponse } from "../api.js";
-import Chart from "../components/Chart.js";
 import {
     Activity,
     AlertTriangle,
@@ -196,197 +195,30 @@ const PerformanceDashboard = (): JSX.Element => {
         return Math.round((successRateScore * 0.5 + performanceScore * 0.3 + tokenScore * 0.2));
     });
 
-    // 实时趋势图表数据
-    const realTimeChartData = createMemo(() => {
-        const data = performanceData()?.data || [];
-        if (!data.length) return { labels: [], datasets: [] };
+    // 合并重复时间点的数据（取非空值，优先取最新）
+    const mergedPerformanceData = createMemo(() => {
+        const rawData = performanceData()?.data || [];
+        if (!rawData.length) return [];
 
-        const labels = data.map((d) => new Date(d.time).toLocaleTimeString());
-        const totalRuns = data.map((d) => d.metrics.total_runs || 0);
-        const errorRate = data.map((d) => (d.metrics.error_rate || 0) * 100);
-        const avgDuration = data.map((d) => (d.metrics.avg_duration_ms || 0) / 1000);
-        const p95Duration = data.map((d) => (d.metrics.p95_duration_ms || 0) / 1000);
+        const dataMap = new Map<string, any>();
+        rawData.forEach((item) => {
+            const time = item.time;
+            if (!dataMap.has(time)) {
+                dataMap.set(time, { ...item });
+            } else {
+                const existing = dataMap.get(time)!;
+                Object.keys(item.metrics).forEach((key) => {
+                    const newValue = item.metrics[key];
+                    if (newValue !== null && newValue !== undefined) {
+                        existing.metrics[key] = newValue;
+                    }
+                });
+            }
+        });
 
-        return {
-            labels,
-            datasets: [
-                {
-                    label: "运行次数",
-                    data: totalRuns,
-                    borderColor: "rgb(59, 130, 246)",
-                    backgroundColor: "rgba(59, 130, 246, 0.1)",
-                    yAxisID: "y",
-                    tension: 0.4,
-                    fill: true,
-                },
-                {
-                    label: "错误率 (%)",
-                    data: errorRate,
-                    borderColor: "rgb(239, 68, 68)",
-                    backgroundColor: "rgba(239, 68, 68, 0.1)",
-                    yAxisID: "y1",
-                    tension: 0.4,
-                },
-                {
-                    label: "平均延迟 (s)",
-                    data: avgDuration,
-                    borderColor: "rgb(16, 185, 129)",
-                    backgroundColor: "rgba(16, 185, 129, 0.1)",
-                    yAxisID: "y2",
-                    tension: 0.4,
-                },
-                {
-                    label: "P95 延迟 (s)",
-                    data: p95Duration,
-                    borderColor: "rgb(245, 158, 11)",
-                    backgroundColor: "rgba(245, 158, 11, 0.1)",
-                    yAxisID: "y2",
-                    tension: 0.4,
-                },
-            ],
-        };
+        return Array.from(dataMap.values())
+            .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
     });
-
-    const realTimeChartOptions = createMemo(() => ({
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-            mode: "index" as const,
-            intersect: false,
-        },
-        plugins: {
-            legend: {
-                position: "top" as const,
-            },
-        },
-        scales: {
-            x: {
-                title: {
-                    display: true,
-                    text: "时间",
-                },
-            },
-            y: {
-                type: "linear",
-                display: true,
-                position: "left",
-                title: {
-                    display: true,
-                    text: "次数",
-                },
-                beginAtZero: true,
-            },
-            y1: {
-                type: "linear",
-                display: true,
-                position: "right",
-                title: {
-                    display: true,
-                    text: "错误率 (%)",
-                },
-                beginAtZero: true,
-                grid: {
-                    drawOnChartArea: false,
-                },
-            },
-            y2: {
-                type: "linear",
-                display: false,
-                position: "right",
-                grid: {
-                    drawOnChartArea: false,
-                },
-            },
-        },
-    }));
-
-    // P95/P99 分布图表
-const percentileChart = createMemo(() => {
-    const data = performanceData()?.data || [];
-    if (!data.length) return { labels: [], datasets: [] };
-
-    const labels = data.map((d) => new Date(d.time).toLocaleTimeString());
-    const p95Duration = data.map((d) => (d.metrics.p95_duration_ms || 0) / 1000);
-    const p99Duration = data.map((d) => (d.metrics.p99_duration_ms || 0) / 1000);
-    const p95Ttft = data.map((d) => (d.metrics.p95_ttft_ms || 0) / 1000);
-
-    return {
-        labels,
-        datasets: [
-            {
-                label: "P95 响应延迟 (s)",
-                data: p95Duration,
-                borderColor: "rgb(245, 158, 11)",
-                backgroundColor: "rgba(245, 158, 11, 0.1)",
-                yAxisID: "y",
-                tension: 0.4,
-                fill: true,
-            },
-            {
-                label: "P99 响应延迟 (s)",
-                data: p99Duration,
-                borderColor: "rgb(239, 68, 68)",
-                backgroundColor: "rgba(239, 68, 68, 0.1)",
-                yAxisID: "y",
-                tension: 0.4,
-                fill: true,
-            },
-            {
-                label: "P95 首包时间 (s)",
-                data: p95Ttft,
-                borderColor: "rgb(139, 92, 246)",
-                backgroundColor: "rgba(139, 92, 246, 0.1)",
-                yAxisID: "y1",
-                tension: 0.4,
-            },
-        ],
-    };
-});
-
-    const percentileChartOptions = createMemo(() => ({
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-            mode: "index" as const,
-            intersect: false,
-        },
-        plugins: {
-            legend: {
-                position: "top" as const,
-            },
-        },
-        scales: {
-            x: {
-                title: {
-                    display: true,
-                    text: "时间",
-                },
-            },
-            y: {
-                type: "linear",
-                display: true,
-                position: "left",
-                title: {
-                    display: true,
-                    text: "响应延迟 (s)",
-                },
-                beginAtZero: true,
-            },
-            y1: {
-                type: "linear",
-                display: true,
-                position: "right",
-                title: {
-                    display: true,
-                    text: "首包时间 (s)",
-                },
-                beginAtZero: true,
-                grid: {
-                    drawOnChartArea: false,
-                },
-            },
-        },
-    }));
 
     const handleRefresh = () => {
         setRefreshKey((prev) => prev + 1);
@@ -483,38 +315,100 @@ const percentileChart = createMemo(() => {
                     </div>
                 )}
 
-                {/* Real-time Charts */}
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
-                        <h2 class="text-lg font-semibold text-gray-700 mb-4">实时趋势</h2>
-                        <div class="h-80">
-                            <Chart
-                                type="line"
-                                data={realTimeChartData()}
-                                options={realTimeChartOptions()}
-                            />
-                        </div>
+                {/* Performance Data Table */}
+                <div class="bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <div class="p-4 border-b border-gray-200">
+                        <h2 class="text-lg font-semibold text-gray-700">性能数据详情</h2>
+                        <p class="text-sm text-gray-500 mt-1">按时间统计的性能指标</p>
                     </div>
-
-                    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
-                        <h2 class="text-lg font-semibold text-gray-700 mb-4">P95/P99 延迟分布</h2>
-                        <div class="h-80">
-                            <Chart
-                                type="line"
-                                data={percentileChart()}
-                                options={percentileChartOptions()}
-                            />
-                        </div>
+                    <div class="overflow-x-auto">
+                        {mergedPerformanceData().length > 0 ? (
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-700">时间</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-700">总运行次数</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-700">成功/失败</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-700">错误率</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-700">平均延迟 (s)</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-700">P95 延迟 (s)</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-700">P99 延迟 (s)</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-700">平均首包 (s)</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-700">P95 首包 (s)</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-700">Token 总数</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-700">独立用户</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    <For each={mergedPerformanceData()}>
+                                        {(item) => (
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="px-4 py-3 text-gray-900 whitespace-nowrap">
+                                                    {new Date(item.time).toLocaleString()}
+                                                </td>
+                                                <td class="px-4 py-3 text-gray-900">
+                                                    {(item.metrics.total_runs || 0).toLocaleString()}
+                                                </td>
+                                                <td class="px-4 py-3 text-gray-600">
+                                                    {(item.metrics.successful_runs || 0).toLocaleString()} / {(item.metrics.failed_runs || 0).toLocaleString()}
+                                                </td>
+                                                <td class="px-4 py-3 text-gray-900">
+                                                    {item.metrics.error_rate !== null && item.metrics.error_rate !== undefined
+                                                        ? `${(item.metrics.error_rate * 100).toFixed(2)}%`
+                                                        : "N/A"}
+                                                </td>
+                                                <td class="px-4 py-3 text-gray-900">
+                                                    {item.metrics.avg_duration_ms !== null && item.metrics.avg_duration_ms !== undefined
+                                                        ? `${(item.metrics.avg_duration_ms / 1000).toFixed(2)}`
+                                                        : "N/A"}
+                                                </td>
+                                                <td class="px-4 py-3 text-gray-900">
+                                                    {item.metrics.p95_duration_ms !== null && item.metrics.p95_duration_ms !== undefined
+                                                        ? `${(item.metrics.p95_duration_ms / 1000).toFixed(2)}`
+                                                        : "N/A"}
+                                                </td>
+                                                <td class="px-4 py-3 text-gray-900">
+                                                    {item.metrics.p99_duration_ms !== null && item.metrics.p99_duration_ms !== undefined
+                                                        ? `${(item.metrics.p99_duration_ms / 1000).toFixed(2)}`
+                                                        : "N/A"}
+                                                </td>
+                                                <td class="px-4 py-3 text-gray-900">
+                                                    {item.metrics.avg_ttft_ms !== null && item.metrics.avg_ttft_ms !== undefined
+                                                        ? `${(item.metrics.avg_ttft_ms / 1000).toFixed(2)}`
+                                                        : "N/A"}
+                                                </td>
+                                                <td class="px-4 py-3 text-gray-900">
+                                                    {item.metrics.p95_ttft_ms !== null && item.metrics.p95_ttft_ms !== undefined
+                                                        ? `${(item.metrics.p95_ttft_ms / 1000).toFixed(2)}`
+                                                        : "N/A"}
+                                                </td>
+                                                <td class="px-4 py-3 text-gray-900">
+                                                    {(item.metrics.total_tokens_sum || 0).toLocaleString()}
+                                                </td>
+                                                <td class="px-4 py-3 text-gray-900">
+                                                    {(item.metrics.distinct_users || 0).toLocaleString()}
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </For>
+                                </tbody>
+                            </table>
+                        ) : (
+                            <div class="p-8 text-center text-gray-500">
+                                <Activity class="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                                <p>暂无性能数据</p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 {/* Performance Alerts */}
-                {performanceData()?.data?.length > 0 && (
+                {mergedPerformanceData().length > 0 && (
                     <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
                         <h2 class="text-lg font-semibold text-gray-700 mb-4">性能异常检测</h2>
                         <div class="space-y-2">
                             {(() => {
-                                const data = performanceData()?.data || [];
+                                const data = mergedPerformanceData();
                                 const lastDataPoint = data[data.length - 1];
                                 const alerts: JSX.Element[] = [];
 
@@ -527,7 +421,7 @@ const percentileChart = createMemo(() => {
                                                     高错误率警告
                                                 </p>
                                                 <p class="text-xs text-red-600">
-                                                    当前错误率 {(lastDataPoint.metrics.error_rate * 100).toFixed(2)}%
+                                                    当前错误率 {((lastDataPoint.metrics.error_rate || 0) * 100).toFixed(2)}%
                                                 </p>
                                             </div>
                                         </div>

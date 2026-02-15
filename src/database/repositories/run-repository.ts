@@ -255,7 +255,8 @@ export class RunRepository {
                     updateData.events = value;
                 }
                 // 自动提取并更新 time_to_first_token
-                updateData.time_to_first_token = extractTimeToFirstTokenFromEvents(value);
+                updateData.time_to_first_token =
+                    extractTimeToFirstTokenFromEvents(value);
                 break;
 
             case "extra":
@@ -414,7 +415,8 @@ export class RunRepository {
             .selectFrom("runs")
             .selectAll()
             .where("trace_id", "=", traceId)
-            .orderBy("start_time", "desc")
+            // 保证前端显示从先到后
+            .orderBy("start_time", "asc")
             .execute();
 
         return runs.map((run) => ({
