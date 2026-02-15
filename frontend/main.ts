@@ -40,25 +40,17 @@ render(() => {
                     ),
                 }),
                 Route({
-                    path: "/trends",
+                    path: "/dashboard",
                     component: lazy(() =>
-                        import("./pages/TrendComparisonPage.jsx").then((res) => {
+                        import("./pages/PerformanceDashboard.tsx").then((res) => {
                             return { default: res.default };
                         })
                     ),
                 }),
                 Route({
-                    path: "/performance",
+                    path: "/cost",
                     component: lazy(() =>
-                        import("./pages/PerformanceComparePage.jsx").then((res) => {
-                            return { default: res.default };
-                        })
-                    ),
-                }),
-                Route({
-                    path: "/anomaly",
-                    component: lazy(() =>
-                        import("./pages/AnomalyDetectionPage.jsx").then((res) => {
+                        import("./pages/CostAnalysis.tsx").then((res) => {
                             return { default: res.default };
                         })
                     ),

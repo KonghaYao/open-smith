@@ -110,7 +110,7 @@ export class BaseDatabase {
 
     // 验证关键表是否存在
     private async verifyTables(): Promise<void> {
-        const requiredTables = ['systems', 'runs', 'feedback', 'attachments', 'run_stats_raw'];
+        const requiredTables = ['systems', 'runs', 'feedback', 'attachments'];
 
         for (const tableName of requiredTables) {
             try {
@@ -122,7 +122,7 @@ export class BaseDatabase {
                     )
                 `.execute(this.db);
 
-                const exists = result.rows[0]?.exists;
+                const exists = (result.rows[0] as any)?.exists;
                 if (!exists) {
                     console.error(`Required table '${tableName}' does not exist after initialization`);
                     console.error(`Please check database initialization logs above`);
@@ -153,7 +153,7 @@ export class BaseDatabase {
                     )
                 `.execute(this.db);
 
-                const exists = result.rows[0]?.exists;
+                const exists = (result.rows[0] as any)?.exists;
 
                 if (exists) {
                     // 启用实时聚合 - 直接使用字符串插值，避免 sql.raw 嵌套问题

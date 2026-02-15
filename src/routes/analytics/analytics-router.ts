@@ -376,13 +376,132 @@ export function createAnalyticsRouter(db: Kysely<Database>) {
 
     // GET /api/v1/analytics/summary - 统计概览
     app.get("/summary", async (c) => {
-        return c.json({
-            success: false,
-            error: {
-                code: "NOT_IMPLEMENTED",
-                message: "This endpoint is not yet implemented",
-            },
-        }, 501);
+        try {
+            const query = SummaryQuerySchema.parse(c.req.query());
+
+            // 设置默认时间范围（最近24小时）
+            const endTime = query.end_time ? new Date(query.end_time) : new Date();
+            const startTime = query.start_time ? new Date(query.start_time) : new Date(endTime.getTime() - 24 * 60 * 60 * 1000);
+
+            // 构建 WHERE 条件
+            const whereConditions: string[] = [];
+
+            if (query.filters.system?.length) {
+                whereConditions.push(`system IN ('${query.filters.system.join("','")}')`);
+            }
+            if (query.filters.model_name?.length) {
+                whereConditions.push(`model_name IN ('${query.filters.model_name.join("','")}')`);
+            }
+
+            whereConditions.push(`stat_hour >= '${startTime.toISOString()}'`);
+            whereConditions.push(`stat_hour <= '${endTime.toISOString()}'`);
+
+            const whereClause = `WHERE ${whereConditions.join(" AND ")}`;
+
+            // 查询基础统计信息
+            const baseStatsSql = `
+                SELECT
+                    COALESCE(SUM(total_runs), 0) as total_runs,
+                    COALESCE(SUM(successful_runs), 0) as successful_runs,
+                    COALESCE(SUM(failed_runs), 0) as failed_runs,
+                    COALESCE(SUM(total_duration_ms), 0) as total_duration_ms,
+                    COALESCE(SUM(total_tokens_sum), 0) as total_tokens_sum,
+                    COALESCE(SUM(avg_ttft_ms * total_runs), 0) as weighted_ttft_sum,
+                    COALESCE(SUM(avg_duration_ms * total_runs), 0) as weighted_duration_sum
+                FROM run_stats_hourly
+                ${whereClause}
+            `;
+
+            const baseStatsResult = await sql.raw(baseStatsSql).execute(db);
+            const baseStats = baseStatsResult.rows[0];
+
+            const totalRuns = Number(baseStats.total_runs ?? 0);
+            const successfulRuns = Number(baseStats.successful_runs ?? 0);
+            const failedRuns = Number(baseStats.failed_runs ?? 0);
+            const successRate = totalRuns > 0 ? (successfulRuns / totalRuns) : 0;
+            const avgDurationMs = totalRuns > 0 ? (Number(baseStats.weighted_duration_sum ?? 0) / totalRuns) : 0;
+            const totalTokens = Number(baseStats.total_tokens_sum ?? 0);
+            const avgTokensPerRun = totalRuns > 0 ? (totalTokens / totalRuns) : 0;
+            const avgTtftMs = totalRuns > 0 ? (Number(baseStats.weighted_ttft_sum ?? 0) / totalRuns) : 0;
+
+            // 查询 P95/P99 延迟（需要单独计算）
+            const percentileSql = `
+                SELECT
+                    COALESCE(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY p95_duration_ms), 0) as p95_duration,
+                    COALESCE(PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY p99_duration_ms), 0) as p99_duration,
+                    COALESCE(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY p95_ttft_ms), 0) as p95_ttft
+                FROM run_stats_hourly
+                ${whereClause}
+            `;
+
+            const percentileResult = await sql.raw(percentileSql).execute(db);
+            const percentiles = percentileResult.rows[0];
+
+            // 查询独立用户数
+            const distinctUsersSql = `
+                SELECT COALESCE(SUM(distinct_users), 0) as distinct_users
+                FROM run_stats_hourly
+                ${whereClause}
+            `;
+
+            const usersResult = await sql.raw(distinctUsersSql).execute(db);
+            const distinctUsers = Number(usersResult.rows[0]?.distinct_users ?? 0);
+
+            // 查询热门模型
+            const topModelsSql = `
+                SELECT
+                    model_name,
+                    SUM(total_runs) as runs,
+                    COALESCE(SUM(avg_duration_ms * total_runs) / NULLIF(SUM(total_runs), 0), 0) as avg_duration_ms
+                FROM run_stats_hourly
+                ${whereClause}
+                GROUP BY model_name
+                ORDER BY runs DESC
+                LIMIT 5
+            `;
+
+            const topModelsResult = await sql.raw(topModelsSql).execute(db);
+            const topModels = topModelsResult.rows.map((row: any) => ({
+                model_name: row.model_name || "unknown",
+                runs: Number(row.runs ?? 0),
+                avg_duration_ms: Number(row.avg_duration_ms ?? 0),
+            }));
+
+            return c.json({
+                success: true,
+                data: {
+                    runs: {
+                        total: totalRuns,
+                        successful: successfulRuns,
+                        failed: failedRuns,
+                        success_rate: successRate,
+                    },
+                    performance: {
+                        avg_duration_ms: avgDurationMs,
+                        p95_duration_ms: Number(percentiles.p95_duration ?? 0),
+                        p99_duration_ms: Number(percentiles.p99_duration ?? 0),
+                        avg_ttft_ms: avgTtftMs,
+                    },
+                    tokens: {
+                        total: totalTokens,
+                        avg_per_run: avgTokensPerRun,
+                    },
+                    users: {
+                        distinct: distinctUsers,
+                    },
+                    top_models: topModels,
+                },
+            });
+        } catch (error: any) {
+            console.error("Error in /summary:", error);
+            return c.json({
+                success: false,
+                error: {
+                    code: "ANALYTICS_ERROR",
+                    message: error.message || "Failed to query summary data",
+                },
+            }, 500);
+        }
     });
 
     return app;

@@ -1,7 +1,7 @@
 -- Open Smith TimescaleDB 数据库初始化脚本
--- 版本: 2.1
+-- 版本: 2.3
 -- 创建日期: 2026-02-15
--- 更新日期: 2026-02-15 - 添加 run_type 过滤，只统计 LLM 运行
+-- 更新日期: 2026-02-15 - 修复统计问题：只统计 run_type = 'llm' 的记录
 
 -- =====================================================
 -- 1. 创建扩展
@@ -127,55 +127,10 @@ CREATE TABLE IF NOT EXISTS attachments (
 CREATE INDEX IF NOT EXISTS idx_attachments_run_id ON attachments (run_id);
 
 -- =====================================================
--- 3. 创建统计原始数据表 (Hypertable)
+-- 3. 创建连续聚合视图（直接在 runs 表上）
 -- =====================================================
 
--- 3.1 创建 run_stats_raw 表 (用于连续聚合)
-CREATE TABLE IF NOT EXISTS run_stats_raw (
-    id TEXT NOT NULL,
-    stat_hour TIMESTAMPTZ NOT NULL,
-    model_name TEXT,
-    system TEXT NOT NULL,
-    run_id TEXT NOT NULL,
-    duration_ms INTEGER,
-    token_count INTEGER DEFAULT 0,
-    ttft_ms INTEGER,
-    is_success BOOLEAN NOT NULL DEFAULT TRUE,
-    user_id TEXT,
-    run_type TEXT,  -- 运行类型，用于过滤统计
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (id, stat_hour)
-);
-
--- 创建超表，按 stat_hour 分区
-DO $$
-BEGIN
-    -- 检查 run_stats_raw 表是否已经是 hypertable
-    IF NOT EXISTS (
-        SELECT 1 FROM timescaledb_information.hypertables
-        WHERE hypertable_name = 'run_stats_raw'
-    ) THEN
-        PERFORM create_hypertable('run_stats_raw', 'stat_hour', if_not_exists => TRUE);
-        RAISE NOTICE 'Created hypertable for run_stats_raw';
-    ELSE
-        RAISE NOTICE 'run_stats_raw table is already a hypertable';
-    END IF;
-EXCEPTION
-    WHEN OTHERS THEN
-        RAISE NOTICE 'Error creating hypertable for run_stats_raw (may already exist): %', SQLERRM;
-END $$;
-
--- 创建索引
-CREATE INDEX IF NOT EXISTS idx_run_stats_raw_system ON run_stats_raw (system);
-CREATE INDEX IF NOT EXISTS idx_run_stats_raw_model_name ON run_stats_raw (model_name);
-CREATE INDEX IF NOT EXISTS idx_run_stats_raw_run_type ON run_stats_raw (run_type);
-CREATE INDEX IF NOT EXISTS idx_run_stats_raw_stat_hour ON run_stats_raw (stat_hour DESC);
-
--- =====================================================
--- 4. 创建连续聚合视图
--- =====================================================
-
--- 4.1 小时级聚合视图
+-- 3.1 小时级聚合视图
 DO $$
 BEGIN
     -- 检查视图是否已存在
@@ -188,24 +143,28 @@ BEGIN
             WITH (timescaledb.continuous)
             AS
             SELECT
-                time_bucket(''1 hour'', stat_hour) AS stat_hour,
+                time_bucket(''1 hour'', start_time) AS stat_hour,
                 model_name,
                 system,
-                COUNT(*) AS total_runs,
-                SUM(CASE WHEN is_success THEN 1 ELSE 0 END) AS successful_runs,
-                SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END) AS failed_runs,
-                (SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0)) AS error_rate,
-                SUM(duration_ms) AS total_duration_ms,
-                AVG(duration_ms) AS avg_duration_ms,
-                percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration_ms,
-                percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_duration_ms,
-                SUM(token_count) AS total_tokens_sum,
-                AVG(token_count) AS avg_tokens_per_run,
-                AVG(ttft_ms) AS avg_ttft_ms,
-                percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95_ttft_ms,
-                COUNT(DISTINCT user_id) AS distinct_users
-            FROM run_stats_raw
-            GROUP BY time_bucket(''1 hour'', stat_hour), model_name, system
+                COUNT(*) FILTER (WHERE run_type = ''llm'') AS total_runs,
+                SUM(CASE WHEN run_type = ''llm'' AND error IS NULL THEN 1 ELSE 0 END) AS successful_runs,
+                SUM(CASE WHEN run_type = ''llm'' AND error IS NOT NULL THEN 1 ELSE 0 END) AS failed_runs,
+                (SUM(CASE WHEN run_type = ''llm'' AND error IS NOT NULL THEN 1 ELSE 0 END)::FLOAT /
+                 NULLIF(SUM(CASE WHEN run_type = ''llm'' THEN 1 ELSE 0 END), 0)) AS error_rate,
+                SUM(EXTRACT(EPOCH FROM (end_time - start_time)) * 1000) FILTER (WHERE run_type = ''llm'') AS total_duration_ms,
+                AVG(EXTRACT(EPOCH FROM (end_time - start_time)) * 1000) FILTER (WHERE run_type = ''llm'') AS avg_duration_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (end_time - start_time)) * 1000)
+                    FILTER (WHERE run_type = ''llm'') AS p95_duration_ms,
+                percentile_cont(0.99) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (end_time - start_time)) * 1000)
+                    FILTER (WHERE run_type = ''llm'') AS p99_duration_ms,
+                SUM(total_tokens) FILTER (WHERE run_type = ''llm'') AS total_tokens_sum,
+                AVG(total_tokens) FILTER (WHERE run_type = ''llm'') AS avg_tokens_per_run,
+                AVG(time_to_first_token) FILTER (WHERE run_type = ''llm'') AS avg_ttft_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY time_to_first_token)
+                    FILTER (WHERE run_type = ''llm'') AS p95_ttft_ms,
+                COUNT(DISTINCT user_id) FILTER (WHERE run_type = ''llm'') AS distinct_users
+            FROM runs
+            GROUP BY time_bucket(''1 hour'', start_time), model_name, system
             WITH NO DATA
         ');
 
@@ -230,7 +189,7 @@ EXCEPTION
         RAISE NOTICE 'Error creating continuous aggregate run_stats_hourly: %', SQLERRM;
 END $$;
 
--- 4.2 15分钟级聚合视图
+-- 3.2 15分钟级聚合视图
 DO $$
 BEGIN
     -- 检查视图是否已存在
@@ -243,24 +202,28 @@ BEGIN
             WITH (timescaledb.continuous)
             AS
             SELECT
-                time_bucket(''15 minutes'', stat_hour) AS stat_period,
+                time_bucket(''15 minutes'', start_time) AS stat_period,
                 model_name,
                 system,
-                COUNT(*) AS total_runs,
-                SUM(CASE WHEN is_success THEN 1 ELSE 0 END) AS successful_runs,
-                SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END) AS failed_runs,
-                (SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0)) AS error_rate,
-                SUM(duration_ms) AS total_duration_ms,
-                AVG(duration_ms) AS avg_duration_ms,
-                percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration_ms,
-                percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_duration_ms,
-                SUM(token_count) AS total_tokens_sum,
-                AVG(token_count) AS avg_tokens_per_run,
-                AVG(ttft_ms) AS avg_ttft_ms,
-                percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95_ttft_ms,
-                COUNT(DISTINCT user_id) AS distinct_users
-            FROM run_stats_raw
-            GROUP BY time_bucket(''15 minutes'', stat_hour), model_name, system
+                COUNT(*) FILTER (WHERE run_type = ''llm'') AS total_runs,
+                SUM(CASE WHEN run_type = ''llm'' AND error IS NULL THEN 1 ELSE 0 END) AS successful_runs,
+                SUM(CASE WHEN run_type = ''llm'' AND error IS NOT NULL THEN 1 ELSE 0 END) AS failed_runs,
+                (SUM(CASE WHEN run_type = ''llm'' AND error IS NOT NULL THEN 1 ELSE 0 END)::FLOAT /
+                 NULLIF(SUM(CASE WHEN run_type = ''llm'' THEN 1 ELSE 0 END), 0)) AS error_rate,
+                SUM(EXTRACT(EPOCH FROM (end_time - start_time)) * 1000) FILTER (WHERE run_type = ''llm'') AS total_duration_ms,
+                AVG(EXTRACT(EPOCH FROM (end_time - start_time)) * 1000) FILTER (WHERE run_type = ''llm'') AS avg_duration_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (end_time - start_time)) * 1000)
+                    FILTER (WHERE run_type = ''llm'') AS p95_duration_ms,
+                percentile_cont(0.99) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (end_time - start_time)) * 1000)
+                    FILTER (WHERE run_type = ''llm'') AS p99_duration_ms,
+                SUM(total_tokens) FILTER (WHERE run_type = ''llm'') AS total_tokens_sum,
+                AVG(total_tokens) FILTER (WHERE run_type = ''llm'') AS avg_tokens_per_run,
+                AVG(time_to_first_token) FILTER (WHERE run_type = ''llm'') AS avg_ttft_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY time_to_first_token)
+                    FILTER (WHERE run_type = ''llm'') AS p95_ttft_ms,
+                COUNT(DISTINCT user_id) FILTER (WHERE run_type = ''llm'') AS distinct_users
+            FROM runs
+            GROUP BY time_bucket(''15 minutes'', start_time), model_name, system
             WITH NO DATA
         ');
 
@@ -285,7 +248,7 @@ EXCEPTION
         RAISE NOTICE 'Error creating continuous aggregate run_stats_15min: %', SQLERRM;
 END $$;
 
--- 4.3 天级聚合视图
+-- 3.3 天级聚合视图
 DO $$
 BEGIN
     -- 检查视图是否已存在
@@ -298,24 +261,28 @@ BEGIN
             WITH (timescaledb.continuous)
             AS
             SELECT
-                time_bucket(''1 day'', stat_hour) AS stat_period,
+                time_bucket(''1 day'', start_time) AS stat_period,
                 model_name,
                 system,
-                COUNT(*) AS total_runs,
-                SUM(CASE WHEN is_success THEN 1 ELSE 0 END) AS successful_runs,
-                SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END) AS failed_runs,
-                (SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0)) AS error_rate,
-                SUM(duration_ms) AS total_duration_ms,
-                AVG(duration_ms) AS avg_duration_ms,
-                percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration_ms,
-                percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_duration_ms,
-                SUM(token_count) AS total_tokens_sum,
-                AVG(token_count) AS avg_tokens_per_run,
-                AVG(ttft_ms) AS avg_ttft_ms,
-                percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95_ttft_ms,
-                COUNT(DISTINCT user_id) AS distinct_users
-            FROM run_stats_raw
-            GROUP BY time_bucket(''1 day'', stat_hour), model_name, system
+                COUNT(*) FILTER (WHERE run_type = ''llm'') AS total_runs,
+                SUM(CASE WHEN run_type = ''llm'' AND error IS NULL THEN 1 ELSE 0 END) AS successful_runs,
+                SUM(CASE WHEN run_type = ''llm'' AND error IS NOT NULL THEN 1 ELSE 0 END) AS failed_runs,
+                (SUM(CASE WHEN run_type = ''llm'' AND error IS NOT NULL THEN 1 ELSE 0 END)::FLOAT /
+                 NULLIF(SUM(CASE WHEN run_type = ''llm'' THEN 1 ELSE 0 END), 0)) AS error_rate,
+                SUM(EXTRACT(EPOCH FROM (end_time - start_time)) * 1000) FILTER (WHERE run_type = ''llm'') AS total_duration_ms,
+                AVG(EXTRACT(EPOCH FROM (end_time - start_time)) * 1000) FILTER (WHERE run_type = ''llm'') AS avg_duration_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (end_time - start_time)) * 1000)
+                    FILTER (WHERE run_type = ''llm'') AS p95_duration_ms,
+                percentile_cont(0.99) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (end_time - start_time)) * 1000)
+                    FILTER (WHERE run_type = ''llm'') AS p99_duration_ms,
+                SUM(total_tokens) FILTER (WHERE run_type = ''llm'') AS total_tokens_sum,
+                AVG(total_tokens) FILTER (WHERE run_type = ''llm'') AS avg_tokens_per_run,
+                AVG(time_to_first_token) FILTER (WHERE run_type = ''llm'') AS avg_ttft_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY time_to_first_token)
+                    FILTER (WHERE run_type = ''llm'') AS p95_ttft_ms,
+                COUNT(DISTINCT user_id) FILTER (WHERE run_type = ''llm'') AS distinct_users
+            FROM runs
+            GROUP BY time_bucket(''1 day'', start_time), model_name, system
         ');
 
         -- 配置天级聚合刷新策略
@@ -339,7 +306,7 @@ EXCEPTION
         RAISE NOTICE 'Error creating continuous aggregate run_stats_daily: %', SQLERRM;
 END $$;
 
--- 4.4 周级聚合视图
+-- 3.4 周级聚合视图
 DO $$
 BEGIN
     -- 检查视图是否已存在
@@ -352,24 +319,28 @@ BEGIN
             WITH (timescaledb.continuous)
             AS
             SELECT
-                time_bucket(''1 week'', stat_hour) AS stat_period,
+                time_bucket(''1 week'', start_time) AS stat_period,
                 model_name,
                 system,
-                COUNT(*) AS total_runs,
-                SUM(CASE WHEN is_success THEN 1 ELSE 0 END) AS successful_runs,
-                SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END) AS failed_runs,
-                (SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0)) AS error_rate,
-                SUM(duration_ms) AS total_duration_ms,
-                AVG(duration_ms) AS avg_duration_ms,
-                percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration_ms,
-                percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_duration_ms,
-                SUM(token_count) AS total_tokens_sum,
-                AVG(token_count) AS avg_tokens_per_run,
-                AVG(ttft_ms) AS avg_ttft_ms,
-                percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95_ttft_ms,
-                COUNT(DISTINCT user_id) AS distinct_users
-            FROM run_stats_raw
-            GROUP BY time_bucket(''1 week'', stat_hour), model_name, system
+                COUNT(*) FILTER (WHERE run_type = ''llm'') AS total_runs,
+                SUM(CASE WHEN run_type = ''llm'' AND error IS NULL THEN 1 ELSE 0 END) AS successful_runs,
+                SUM(CASE WHEN run_type = ''llm'' AND error IS NOT NULL THEN 1 ELSE 0 END) AS failed_runs,
+                (SUM(CASE WHEN run_type = ''llm'' AND error IS NOT NULL THEN 1 ELSE 0 END)::FLOAT /
+                 NULLIF(SUM(CASE WHEN run_type = ''llm'' THEN 1 ELSE 0 END), 0)) AS error_rate,
+                SUM(EXTRACT(EPOCH FROM (end_time - start_time)) * 1000) FILTER (WHERE run_type = ''llm'') AS total_duration_ms,
+                AVG(EXTRACT(EPOCH FROM (end_time - start_time)) * 1000) FILTER (WHERE run_type = ''llm'') AS avg_duration_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (end_time - start_time)) * 1000)
+                    FILTER (WHERE run_type = ''llm'') AS p95_duration_ms,
+                percentile_cont(0.99) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (end_time - start_time)) * 1000)
+                    FILTER (WHERE run_type = ''llm'') AS p99_duration_ms,
+                SUM(total_tokens) FILTER (WHERE run_type = ''llm'') AS total_tokens_sum,
+                AVG(total_tokens) FILTER (WHERE run_type = ''llm'') AS avg_tokens_per_run,
+                AVG(time_to_first_token) FILTER (WHERE run_type = ''llm'') AS avg_ttft_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY time_to_first_token)
+                    FILTER (WHERE run_type = ''llm'') AS p95_ttft_ms,
+                COUNT(DISTINCT user_id) FILTER (WHERE run_type = ''llm'') AS distinct_users
+            FROM runs
+            GROUP BY time_bucket(''1 week'', start_time), model_name, system
         ');
 
         -- 配置周级聚合刷新策略
@@ -393,7 +364,7 @@ EXCEPTION
         RAISE NOTICE 'Error creating continuous aggregate run_stats_weekly: %', SQLERRM;
 END $$;
 
--- 4.5 月级聚合视图
+-- 3.5 月级聚合视图
 DO $$
 BEGIN
     -- 检查视图是否已存在
@@ -406,24 +377,28 @@ BEGIN
             WITH (timescaledb.continuous)
             AS
             SELECT
-                time_bucket(''1 month'', stat_hour) AS stat_period,
+                time_bucket(''1 month'', start_time) AS stat_period,
                 model_name,
                 system,
-                COUNT(*) AS total_runs,
-                SUM(CASE WHEN is_success THEN 1 ELSE 0 END) AS successful_runs,
-                SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END) AS failed_runs,
-                (SUM(CASE WHEN NOT is_success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0)) AS error_rate,
-                SUM(duration_ms) AS total_duration_ms,
-                AVG(duration_ms) AS avg_duration_ms,
-                percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration_ms,
-                percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_duration_ms,
-                SUM(token_count) AS total_tokens_sum,
-                AVG(token_count) AS avg_tokens_per_run,
-                AVG(ttft_ms) AS avg_ttft_ms,
-                percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95_ttft_ms,
-                COUNT(DISTINCT user_id) AS distinct_users
-            FROM run_stats_raw
-            GROUP BY time_bucket(''1 month'', stat_hour), model_name, system
+                COUNT(*) FILTER (WHERE run_type = ''llm'') AS total_runs,
+                SUM(CASE WHEN run_type = ''llm'' AND error IS NULL THEN 1 ELSE 0 END) AS successful_runs,
+                SUM(CASE WHEN run_type = ''llm'' AND error IS NOT NULL THEN 1 ELSE 0 END) AS failed_runs,
+                (SUM(CASE WHEN run_type = ''llm'' AND error IS NOT NULL THEN 1 ELSE 0 END)::FLOAT /
+                 NULLIF(SUM(CASE WHEN run_type = ''llm'' THEN 1 ELSE 0 END), 0)) AS error_rate,
+                SUM(EXTRACT(EPOCH FROM (end_time - start_time)) * 1000) FILTER (WHERE run_type = ''llm'') AS total_duration_ms,
+                AVG(EXTRACT(EPOCH FROM (end_time - start_time)) * 1000) FILTER (WHERE run_type = ''llm'') AS avg_duration_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (end_time - start_time)) * 1000)
+                    FILTER (WHERE run_type = ''llm'') AS p95_duration_ms,
+                percentile_cont(0.99) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (end_time - start_time)) * 1000)
+                    FILTER (WHERE run_type = ''llm'') AS p99_duration_ms,
+                SUM(total_tokens) FILTER (WHERE run_type = ''llm'') AS total_tokens_sum,
+                AVG(total_tokens) FILTER (WHERE run_type = ''llm'') AS avg_tokens_per_run,
+                AVG(time_to_first_token) FILTER (WHERE run_type = ''llm'') AS avg_ttft_ms,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY time_to_first_token)
+                    FILTER (WHERE run_type = ''llm'') AS p95_ttft_ms,
+                COUNT(DISTINCT user_id) FILTER (WHERE run_type = ''llm'') AS distinct_users
+            FROM runs
+            GROUP BY time_bucket(''1 month'', start_time), model_name, system
         ');
 
         -- 配置月级聚合刷新策略
@@ -448,58 +423,10 @@ EXCEPTION
 END $$;
 
 -- =====================================================
--- 5. 创建触发器和函数
+-- 4. 创建辅助函数
 -- =====================================================
 
--- 5.1 创建更新统计数据的触发器函数
-CREATE OR REPLACE FUNCTION update_stats_raw()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- 只统计 run_type = 'llm' 或 run_type 为 NULL 的数据（向后兼容）
-    IF NEW.run_type = 'llm' OR NEW.run_type IS NULL THEN
-        INSERT INTO run_stats_raw (
-            id,
-            stat_hour,
-            model_name,
-            system,
-            run_id,
-            duration_ms,
-            token_count,
-            ttft_ms,
-            is_success,
-            user_id,
-            run_type
-        ) VALUES (
-            gen_random_uuid()::text,
-            NEW.start_time,
-            NEW.model_name,
-            NEW.system,
-            NEW.id,
-            EXTRACT(EPOCH FROM (NEW.end_time - NEW.start_time)) * 1000,
-            COALESCE(NEW.total_tokens, 0),
-            NEW.time_to_first_token,
-            (NEW.error IS NULL),
-            NEW.user_id,
-            NEW.run_type
-        );
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- 5.2 创建触发器
-DROP TRIGGER IF EXISTS trigger_update_stats_raw ON runs;
-CREATE TRIGGER trigger_update_stats_raw
-AFTER INSERT ON runs
-FOR EACH ROW
-EXECUTE FUNCTION update_stats_raw();
-
--- =====================================================
--- 6. 创建辅助函数
--- =====================================================
-
--- 6.1 更新 updated_at 字段的函数
+-- 4.1 更新 updated_at 字段的函数
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -508,7 +435,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 6.2 为需要的表创建触发器
+-- 4.2 为需要的表创建触发器
 DROP TRIGGER IF EXISTS trigger_update_systems_updated_at ON systems;
 CREATE TRIGGER trigger_update_systems_updated_at
 BEFORE UPDATE ON systems
@@ -522,7 +449,20 @@ FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
 -- =====================================================
--- 7. 验证初始化
+-- 5. 清理旧的触发器和表（如果存在）
+-- =====================================================
+
+-- 删除旧的统计更新触发器
+DROP TRIGGER IF EXISTS trigger_update_stats_raw ON runs;
+
+-- 删除旧的触发器函数
+DROP FUNCTION IF EXISTS update_stats_raw();
+
+-- 删除旧的 run_stats_raw 表（如果存在）
+DROP TABLE IF EXISTS run_stats_raw CASCADE;
+
+-- =====================================================
+-- 6. 验证初始化
 -- =====================================================
 
 -- 显示所有创建的表
@@ -545,4 +485,5 @@ ORDER BY view_name;
 
 -- 完成
 SELECT 'TimescaleDB initialization completed successfully!' AS status;
-SELECT 'Only LLM runs will be included in statistics (run_type = ''llm'' or NULL)' AS info;
+SELECT 'Continuous aggregates now query runs table directly (no intermediate run_stats_raw table)' AS info;
+SELECT 'Only LLM runs are included in statistics (run_type = ''llm'')' AS info;

@@ -8,9 +8,11 @@ import {
     CategoryScale,
     LineController,
     BarController,
+    DoughnutController,
     PointElement,
     LineElement,
     BarElement,
+    ArcElement,
 } from "chart.js";
 import type { Component } from "solid-js";
 
@@ -20,9 +22,11 @@ ChartJS.register(
     CategoryScale,
     LineController,
     BarController,
+    DoughnutController,
     PointElement,
     LineElement,
     BarElement,
+    ArcElement,
 );
 
 // 简单的深合并函数
@@ -52,9 +56,9 @@ function deepMerge(target: any, source: any): any {
 
 interface BaseChartProps {
     type: keyof ChartTypeRegistry;
-    data: ChartConfiguration<"line" | "bar" | "scatter">["data"];
+    data: ChartConfiguration<"line" | "bar" | "scatter" | "doughnut">["data"];
     labels?: string[];
-    options?: ChartConfiguration<"line" | "bar" | "scatter">["options"];
+    options?: ChartConfiguration<"line" | "bar" | "scatter" | "doughnut">["options"];
     class?: string;
     height?: number;
     width?: number;

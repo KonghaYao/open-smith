@@ -5,9 +5,8 @@ import {
     Key,
     CirclePlay,
     MessageSquareCode,
-    TrendingUp,
-    BarChart3,
-    Activity,
+    LayoutDashboard,
+    DollarSign,
 } from "lucide-solid";
 
 const menuItems = [
@@ -27,19 +26,14 @@ const menuItems = [
         icon: <ChartBarBig />,
     },
     {
-        href: "#/trends",
-        title: "趋势分析",
-        icon: <TrendingUp />,
+        href: "#/dashboard",
+        title: "性能仪表板",
+        icon: <LayoutDashboard />,
     },
     {
-        href: "#/performance",
-        title: "性能对比",
-        icon: <BarChart3 />,
-    },
-    {
-        href: "#/anomaly",
-        title: "异常检测",
-        icon: <Activity />,
+        href: "#/cost",
+        title: "成本分析",
+        icon: <DollarSign />,
     },
     {
         href: "#/systems",

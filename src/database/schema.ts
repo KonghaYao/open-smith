@@ -62,21 +62,6 @@ export interface AttachmentsTable {
     created_at: Date;
 }
 
-// Run Stats Raw 表 (原始统计数据 - 用于连续聚合)
-export interface RunStatsRawTable {
-    id: string;
-    stat_hour: Date;
-    model_name: string | null;
-    system: string;
-    run_id: string;
-    duration_ms: number | null;
-    token_count: number;
-    ttft_ms: number | null;
-    is_success: boolean;
-    user_id: string | null;
-    run_type: string | null;
-}
-
 // Run Stats Hourly 表 (连续聚合视图)
 export interface RunStatsHourlyTable {
     stat_hour: Date;
@@ -183,7 +168,6 @@ export interface Database {
     runs: RunsTable;
     feedback: FeedbackTable;
     attachments: AttachmentsTable;
-    run_stats_raw: RunStatsRawTable;
     run_stats_hourly: RunStatsHourlyTable;
     run_stats_15min: RunStats15MinTable;
     run_stats_daily: RunStatsDailyTable;

@@ -9,8 +9,8 @@ import type { RunStatsHourlyRecord } from "../../types.js";
  * 注意：TimescaleDB 使用连续聚合自动计算统计数据。
  * 此 repository 现在主要作为查询接口，手动更新统计数据的逻辑已移除。
  *
- * 统计数据通过数据库触发器自动写入 run_stats_raw 表，
- * 然后通过连续聚合视图自动计算各级别的统计数据。
+ * 连续聚合视图直接在 runs 表上创建，无需中间的 run_stats_raw 表。
+ * 统计数据自动计算各级别的统计数据。
  */
 export class RunStatsRepository {
     constructor(private db: Kysely<Database>) {}
