@@ -1,45 +1,19 @@
-// Kysely Dialect 适配器
-import { Kysely, SqliteDialect, PostgresDialect } from "kysely";
+// Kysely Dialect 适配器 - 仅支持 PostgreSQL/TimescaleDB
+import { Kysely, PostgresDialect } from "kysely";
 import type { Database } from "./schema.js";
 import { Pool, type PoolConfig } from "pg";
-import path from "path";
-import fs from "fs";
 
-export let dbType: "pg" | "sqlite" = "sqlite";
-async function createSqliteKysely(
-    connectionString: string,
-): Promise<Kysely<Database>> {
-    const dbPath = connectionString.startsWith("sqlite://")
-        ? new URL(connectionString).pathname
-        : connectionString;
-
-    // 确保文件夹存在
-    const dir = path.dirname(dbPath);
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-    console.log(
-        `📊 Using sqlite3-wasm with Kysely for high performance (Node.js)`,
-    );
-    const { NodeWasmDialect } = await import("kysely-wasm");
-    const { default: Sqlite3 } = await import("node-sqlite3-wasm");
-    const db = new Sqlite3.Database(dbPath); // SQLite 特有：开启 WAL 模式以提高性能
-    return new Kysely<Database>({
-        dialect: new NodeWasmDialect({
-            database: db,
-        }),
-    });
-}
+// 数据库类型标识
+export const dbType = "pg" as const;
 
 /**
- * 创建 PostgreSQL Kysely 实例
+ * 创建 PostgreSQL/TimescaleDB Kysely 实例
  */
 export async function createPostgresKysely(
     config: PoolConfig,
 ): Promise<Kysely<Database>> {
-    console.log(`📊 Using PostgreSQL with Kysely for high performance`);
+    console.log(`📊 Using PostgreSQL/TimescaleDB with Kysely for high performance`);
     const { Pool } = await import("pg");
-    dbType = "pg";
     const pool = new Pool(config);
 
     const dialect = new PostgresDialect({
@@ -50,15 +24,20 @@ export async function createPostgresKysely(
 }
 
 /**
- * 自动检测运行环境并创建对应的 Kysely 实例
+ * 创建 Kysely 实例 - 仅支持 PostgreSQL/TimescaleDB
  */
 export async function createKyselyInstance(config: {
     connectionString: string;
 }): Promise<Kysely<Database>> {
-    if (config?.connectionString.startsWith("postgres")) {
-        return createPostgresKysely({
-            connectionString: config.connectionString,
-        });
+    if (!config?.connectionString) {
+        throw new Error("TRACE_DATABASE_URL environment variable is required");
     }
-    return createSqliteKysely(config?.connectionString);
+
+    if (!config.connectionString.startsWith("postgres")) {
+        throw new Error("Only PostgreSQL/TimescaleDB is supported. Please provide a valid PostgreSQL connection string.");
+    }
+
+    return createPostgresKysely({
+        connectionString: config.connectionString,
+    });
 }

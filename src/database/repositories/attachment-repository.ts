@@ -15,7 +15,7 @@ export class AttachmentRepository {
         storagePath: string,
     ): Promise<AttachmentRecord> {
         const id = uuidv4();
-        const now = new Date().toISOString();
+        const now = new Date();
 
         const record: AttachmentRecord = {
             id,
@@ -24,7 +24,7 @@ export class AttachmentRepository {
             content_type: contentType,
             file_size: fileSize,
             storage_path: storagePath,
-            created_at: now,
+            created_at: now.toISOString(),
         };
 
         await this.db
@@ -36,7 +36,7 @@ export class AttachmentRepository {
                 content_type: record.content_type ?? null,
                 file_size: record.file_size ?? null,
                 storage_path: record.storage_path ?? null,
-                created_at: record.created_at,
+                created_at: now,
             })
             .execute();
 
@@ -52,11 +52,21 @@ export class AttachmentRepository {
             .orderBy("created_at")
             .execute();
 
-        return results.map((r) => ({
-            ...r,
-            content_type: r.content_type ?? "",
-            file_size: r.file_size ?? 0,
-            storage_path: r.storage_path ?? "",
-        }));
+        return results.map((r) => this.mapDbToAttachmentRecord(r));
+    }
+
+    // 映射数据库记录到 AttachmentRecord
+    private mapDbToAttachmentRecord(dbRecord: any): AttachmentRecord {
+        return {
+            id: dbRecord.id,
+            run_id: dbRecord.run_id,
+            filename: dbRecord.filename,
+            content_type: dbRecord.content_type ?? "",
+            file_size: dbRecord.file_size ?? 0,
+            storage_path: dbRecord.storage_path ?? "",
+            created_at: dbRecord.created_at
+                ? new Date(dbRecord.created_at).toISOString()
+                : "",
+        };
     }
 }

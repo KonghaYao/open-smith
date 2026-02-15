@@ -13,7 +13,7 @@ export class FeedbackRepository {
         feedbackData: FeedbackPayload,
     ): Promise<FeedbackRecord> {
         const id = uuidv4();
-        const now = new Date().toISOString();
+        const now = new Date();
 
         const record: FeedbackRecord = {
             id,
@@ -25,7 +25,7 @@ export class FeedbackRepository {
             metadata: feedbackData.metadata
                 ? JSON.stringify(feedbackData.metadata)
                 : undefined,
-            created_at: now,
+            created_at: now.toISOString(),
         };
 
         await this.db
@@ -38,7 +38,7 @@ export class FeedbackRepository {
                 score: record.score ?? null,
                 comment: record.comment ?? null,
                 metadata: record.metadata ?? null,
-                created_at: record.created_at,
+                created_at: now,
             })
             .execute();
 
@@ -54,12 +54,22 @@ export class FeedbackRepository {
             .orderBy("created_at")
             .execute();
 
-        return results.map((r) => ({
-            ...r,
-            feedback_id: r.feedback_id ?? undefined,
-            score: r.score ?? undefined,
-            comment: r.comment ?? undefined,
-            metadata: r.metadata ?? undefined,
-        }));
+        return results.map((r) => this.mapDbToFeedbackRecord(r));
+    }
+
+    // 映射数据库记录到 FeedbackRecord
+    private mapDbToFeedbackRecord(dbRecord: any): FeedbackRecord {
+        return {
+            id: dbRecord.id,
+            trace_id: dbRecord.trace_id,
+            run_id: dbRecord.run_id,
+            feedback_id: dbRecord.feedback_id ?? undefined,
+            score: dbRecord.score ?? undefined,
+            comment: dbRecord.comment ?? undefined,
+            metadata: dbRecord.metadata ?? undefined,
+            created_at: dbRecord.created_at
+                ? new Date(dbRecord.created_at).toISOString()
+                : "",
+        };
     }
 }
