@@ -6,6 +6,7 @@ import {
     createMemo,
 } from "solid-js";
 import { getTimeseries, getSummary, type TimeseriesQuery, type SummaryResponse } from "../api.js";
+import Chart from "../components/Chart.js";
 import {
     Activity,
     AlertTriangle,
@@ -152,6 +153,7 @@ const PerformanceDashboard = (): JSX.Element => {
                 };
 
                 const response = await getTimeseries(query);
+                console.log("PerformanceDashboard - timeseries response:", response);
                 return response;
             } catch (err) {
                 console.error("Failed to fetch performance data", err);
@@ -170,6 +172,7 @@ const PerformanceDashboard = (): JSX.Element => {
                     start_time: startTime.toISOString(),
                     end_time: new Date().toISOString(),
                 });
+                console.log("PerformanceDashboard - summary response:", response);
                 return response;
             } catch (err) {
                 console.error("Failed to fetch summary data", err);
@@ -195,9 +198,9 @@ const PerformanceDashboard = (): JSX.Element => {
         return Math.round((successRateScore * 0.5 + performanceScore * 0.3 + tokenScore * 0.2));
     });
 
-    // 合并重复时间点的数据（取非空值，优先取最新）
+    // 合并重复时间点的数据
     const mergedPerformanceData = createMemo(() => {
-        const rawData = performanceData()?.data || [];
+        const rawData = performanceData?.()?.data || [];
         if (!rawData.length) return [];
 
         const dataMap = new Map<string, any>();
@@ -218,6 +221,200 @@ const PerformanceDashboard = (): JSX.Element => {
 
         return Array.from(dataMap.values())
             .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+    });
+
+    // 运行次数趋势图表数据
+    const runsChartData = createMemo(() => {
+        const data = mergedPerformanceData();
+        if (!data.length) return { labels: [], datasets: [] };
+
+        const labels = data.map((d) => new Date(d.time).toLocaleString());
+
+        return {
+            labels,
+            datasets: [
+                {
+                    label: "总运行次数",
+                    data: data.map((d) => d.metrics.total_runs || 0),
+                    borderColor: "rgb(59, 130, 246)",
+                    backgroundColor: "rgba(59, 130, 246, 0.1)",
+                    tension: 0.4,
+                    fill: true,
+                    yAxisID: "y",
+                },
+                {
+                    label: "成功次数",
+                    data: data.map((d) => d.metrics.successful_runs || 0),
+                    borderColor: "rgb(34, 197, 94)",
+                    backgroundColor: "rgba(34, 197, 94, 0.1)",
+                    tension: 0.4,
+                    yAxisID: "y",
+                },
+                {
+                    label: "失败次数",
+                    data: data.map((d) => d.metrics.failed_runs || 0),
+                    borderColor: "rgb(239, 68, 68)",
+                    backgroundColor: "rgba(239, 68, 68, 0.1)",
+                    tension: 0.4,
+                    yAxisID: "y",
+                },
+            ],
+        };
+    });
+
+    const runsChartOptions = createMemo(() => ({
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+            mode: "index" as const,
+            intersect: false,
+        },
+        plugins: {
+            legend: {
+                position: "top" as const,
+            },
+        },
+        scales: {
+            x: {
+                title: {
+                    display: true,
+                    text: "时间",
+                },
+            },
+            y: {
+                title: {
+                    display: true,
+                    text: "运行次数",
+                },
+                beginAtZero: true,
+            },
+            y1: {
+                type: "linear",
+                display: true,
+                position: "right",
+                grid: {
+                    drawOnChartArea: false,
+                },
+                title: {
+                    display: true,
+                    text: "错误率 (%)",
+                },
+                beginAtZero: true,
+            },
+        },
+    }));
+
+    // 错误率趋势图表数据
+    const errorRateChartData = createMemo(() => {
+        const data = mergedPerformanceData();
+        if (!data.length) return { labels: [], datasets: [] };
+
+        const labels = data.map((d) => new Date(d.time).toLocaleString());
+
+        return {
+            labels,
+            datasets: [
+                {
+                    label: "错误率 (%)",
+                    data: data.map((d) => (d.metrics.error_rate || 0) * 100),
+                    borderColor: "rgb(239, 68, 68)",
+                    backgroundColor: "rgba(239, 68, 68, 0.1)",
+                    tension: 0.4,
+                    fill: true,
+                    yAxisID: "y1",
+                },
+            ],
+        };
+    });
+
+    // 延迟性能图表数据
+    const latencyChartData = createMemo(() => {
+        const data = mergedPerformanceData();
+        if (!data.length) return { labels: [], datasets: [] };
+
+        const labels = data.map((d) => new Date(d.time).toLocaleString());
+
+        return {
+            labels,
+            datasets: [
+                {
+                    label: "平均延迟 (s)",
+                    data: data.map((d) => (d.metrics.avg_duration_ms || 0) / 1000),
+                    borderColor: "rgb(59, 130, 246)",
+                    backgroundColor: "rgba(59, 130, 246, 0.1)",
+                    tension: 0.4,
+                    fill: false,
+                },
+                {
+                    label: "P95 延迟 (s)",
+                    data: data.map((d) => (d.metrics.p95_duration_ms || 0) / 1000),
+                    borderColor: "rgb(249, 115, 22)",
+                    backgroundColor: "rgba(249, 115, 22, 0.1)",
+                    tension: 0.4,
+                    fill: false,
+                },
+                {
+                    label: "P99 延迟 (s)",
+                    data: data.map((d) => (d.metrics.p99_duration_ms || 0) / 1000),
+                    borderColor: "rgb(239, 68, 68)",
+                    backgroundColor: "rgba(239, 68, 68, 0.1)",
+                    tension: 0.4,
+                    fill: false,
+                },
+            ],
+        };
+    });
+
+    // 首包时间图表数据
+    const ttftChartData = createMemo(() => {
+        const data = mergedPerformanceData();
+        if (!data.length) return { labels: [], datasets: [] };
+
+        const labels = data.map((d) => new Date(d.time).toLocaleString());
+
+        return {
+            labels,
+            datasets: [
+                {
+                    label: "平均首包时间 (s)",
+                    data: data.map((d) => (d.metrics.avg_ttft_ms || 0) / 1000),
+                    borderColor: "rgb(139, 92, 246)",
+                    backgroundColor: "rgba(139, 92, 246, 0.1)",
+                    tension: 0.4,
+                    fill: true,
+                },
+                {
+                    label: "P95 首包时间 (s)",
+                    data: data.map((d) => (d.metrics.p95_ttft_ms || 0) / 1000),
+                    borderColor: "rgb(236, 72, 153)",
+                    backgroundColor: "rgba(236, 72, 153, 0.1)",
+                    tension: 0.4,
+                    fill: false,
+                },
+            ],
+        };
+    });
+
+    // Token 消耗图表数据
+    const tokensChartData = createMemo(() => {
+        const data = mergedPerformanceData();
+        if (!data.length) return { labels: [], datasets: [] };
+
+        const labels = data.map((d) => new Date(d.time).toLocaleString());
+
+        return {
+            labels,
+            datasets: [
+                {
+                    label: "Token 消耗 (k)",
+                    data: data.map((d) => (d.metrics.total_tokens_sum || 0) / 1000),
+                    borderColor: "rgb(16, 185, 129)",
+                    backgroundColor: "rgba(16, 185, 129, 0.1)",
+                    tension: 0.4,
+                    fill: true,
+                },
+            ],
+        };
     });
 
     const handleRefresh = () => {
@@ -315,16 +512,175 @@ const PerformanceDashboard = (): JSX.Element => {
                     </div>
                 )}
 
+                {/* Charts Row 1 */}
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* 运行次数趋势 */}
+                    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+                        <h2 class="text-lg font-semibold text-gray-700 mb-4">运行次数趋势</h2>
+                        <div class="h-72">
+                            {runsChartData().labels.length > 0 ? (
+                                <Chart
+                                    type="line"
+                                    data={runsChartData()}
+                                    options={runsChartOptions()}
+                                />
+                            ) : (
+                                <div class="flex items-center justify-center h-full text-gray-500">
+                                    暂无数据
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 延迟性能 */}
+                    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+                        <h2 class="text-lg font-semibold text-gray-700 mb-4">延迟性能</h2>
+                        <div class="h-72">
+                            {latencyChartData().labels.length > 0 ? (
+                                <Chart
+                                    type="line"
+                                    data={latencyChartData()}
+                                    options={{
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        interaction: {
+                                            mode: "index" as const,
+                                            intersect: false,
+                                        },
+                                        plugins: {
+                                            legend: {
+                                                position: "top" as const,
+                                            },
+                                        },
+                                        scales: {
+                                            x: {
+                                                title: {
+                                                    display: true,
+                                                    text: "时间",
+                                                },
+                                            },
+                                            y: {
+                                                title: {
+                                                    display: true,
+                                                    text: "延迟 (秒)",
+                                                },
+                                                beginAtZero: true,
+                                            },
+                                        },
+                                    }}
+                                />
+                            ) : (
+                                <div class="flex items-center justify-center h-full text-gray-500">
+                                    暂无数据
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Charts Row 2 */}
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* 首包时间 */}
+                    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+                        <h2 class="text-lg font-semibold text-gray-700 mb-4">首包时间 (TTFT)</h2>
+                        <div class="h-72">
+                            {ttftChartData().labels.length > 0 ? (
+                                <Chart
+                                    type="line"
+                                    data={ttftChartData()}
+                                    options={{
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        interaction: {
+                                            mode: "index" as const,
+                                            intersect: false,
+                                        },
+                                        plugins: {
+                                            legend: {
+                                                position: "top" as const,
+                                            },
+                                        },
+                                        scales: {
+                                            x: {
+                                                title: {
+                                                    display: true,
+                                                    text: "时间",
+                                                },
+                                            },
+                                            y: {
+                                                title: {
+                                                    display: true,
+                                                    text: "首包时间 (秒)",
+                                                },
+                                                beginAtZero: true,
+                                            },
+                                        },
+                                    }}
+                                />
+                            ) : (
+                                <div class="flex items-center justify-center h-full text-gray-500">
+                                    暂无数据
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Token 消耗 */}
+                    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+                        <h2 class="text-lg font-semibold text-gray-700 mb-4">Token 消耗趋势</h2>
+                        <div class="h-72">
+                            {tokensChartData().labels.length > 0 ? (
+                                <Chart
+                                    type="line"
+                                    data={tokensChartData()}
+                                    options={{
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        interaction: {
+                                            mode: "index" as const,
+                                            intersect: false,
+                                        },
+                                        plugins: {
+                                            legend: {
+                                                position: "top" as const,
+                                            },
+                                        },
+                                        scales: {
+                                            x: {
+                                                title: {
+                                                    display: true,
+                                                    text: "时间",
+                                                },
+                                            },
+                                            y: {
+                                                title: {
+                                                    display: true,
+                                                    text: "Token 数 (k)",
+                                                },
+                                                beginAtZero: true,
+                                            },
+                                        },
+                                    }}
+                                />
+                            ) : (
+                                <div class="flex items-center justify-center h-full text-gray-500">
+                                    暂无数据
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 {/* Performance Data Table */}
                 <div class="bg-white border border-gray-200 rounded-lg shadow-sm">
                     <div class="p-4 border-b border-gray-200">
                         <h2 class="text-lg font-semibold text-gray-700">性能数据详情</h2>
                         <p class="text-sm text-gray-500 mt-1">按时间统计的性能指标</p>
                     </div>
-                    <div class="overflow-x-auto">
+                    <div class="overflow-x-auto max-h-96">
                         {mergedPerformanceData().length > 0 ? (
                             <table class="w-full text-sm">
-                                <thead class="bg-gray-50">
+                                <thead class="bg-gray-50 sticky top-0">
                                     <tr>
                                         <th class="px-4 py-3 text-left font-medium text-gray-700">时间</th>
                                         <th class="px-4 py-3 text-left font-medium text-gray-700">总运行次数</th>

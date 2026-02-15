@@ -5,8 +5,6 @@ import {
     Key,
     CirclePlay,
     MessageSquareCode,
-    LayoutDashboard,
-    DollarSign,
 } from "lucide-solid";
 
 const menuItems = [
@@ -21,19 +19,9 @@ const menuItems = [
         icon: <MessageSquareCode />,
     },
     {
-        href: "#/stats",
-        title: "统计分析",
+        href: "#/analytics",
+        title: "数据分析",
         icon: <ChartBarBig />,
-    },
-    {
-        href: "#/dashboard",
-        title: "性能仪表板",
-        icon: <LayoutDashboard />,
-    },
-    {
-        href: "#/cost",
-        title: "成本分析",
-        icon: <DollarSign />,
     },
     {
         href: "#/systems",

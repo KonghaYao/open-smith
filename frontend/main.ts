@@ -32,6 +32,14 @@ render(() => {
                     ),
                 }),
                 Route({
+                    path: "/analytics",
+                    component: lazy(() =>
+                        import("./pages/UnifiedDashboard.tsx").then((res) => {
+                            return { default: res.default };
+                        })
+                    ),
+                }),
+                Route({
                     path: "/stats",
                     component: lazy(() =>
                         import("./pages/StatsPage.jsx").then((res) => {
