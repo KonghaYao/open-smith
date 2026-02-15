@@ -1,7 +1,7 @@
 -- Open Smith TimescaleDB 数据库初始化脚本
--- 版本: 2.0
+-- 版本: 2.1
 -- 创建日期: 2026-02-15
--- 更新日期: 2026-02-15 - 修复初始化逻辑
+-- 更新日期: 2026-02-15 - 添加 run_type 过滤，只统计 LLM 运行
 
 -- =====================================================
 -- 1. 创建扩展
@@ -142,6 +142,7 @@ CREATE TABLE IF NOT EXISTS run_stats_raw (
     ttft_ms INTEGER,
     is_success BOOLEAN NOT NULL DEFAULT TRUE,
     user_id TEXT,
+    run_type TEXT,  -- 运行类型，用于过滤统计
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (id, stat_hour)
 );
@@ -167,6 +168,7 @@ END $$;
 -- 创建索引
 CREATE INDEX IF NOT EXISTS idx_run_stats_raw_system ON run_stats_raw (system);
 CREATE INDEX IF NOT EXISTS idx_run_stats_raw_model_name ON run_stats_raw (model_name);
+CREATE INDEX IF NOT EXISTS idx_run_stats_raw_run_type ON run_stats_raw (run_type);
 CREATE INDEX IF NOT EXISTS idx_run_stats_raw_stat_hour ON run_stats_raw (stat_hour DESC);
 
 -- =====================================================
@@ -453,29 +455,34 @@ END $$;
 CREATE OR REPLACE FUNCTION update_stats_raw()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO run_stats_raw (
-        id,
-        stat_hour,
-        model_name,
-        system,
-        run_id,
-        duration_ms,
-        token_count,
-        ttft_ms,
-        is_success,
-        user_id
-    ) VALUES (
-        gen_random_uuid()::text,
-        NEW.start_time,
-        NEW.model_name,
-        NEW.system,
-        NEW.id,
-        EXTRACT(EPOCH FROM (NEW.end_time - NEW.start_time)) * 1000,
-        COALESCE(NEW.total_tokens, 0),
-        NEW.time_to_first_token,
-        (NEW.error IS NULL),
-        NEW.user_id
-    );
+    -- 只统计 run_type = 'llm' 或 run_type 为 NULL 的数据（向后兼容）
+    IF NEW.run_type = 'llm' OR NEW.run_type IS NULL THEN
+        INSERT INTO run_stats_raw (
+            id,
+            stat_hour,
+            model_name,
+            system,
+            run_id,
+            duration_ms,
+            token_count,
+            ttft_ms,
+            is_success,
+            user_id,
+            run_type
+        ) VALUES (
+            gen_random_uuid()::text,
+            NEW.start_time,
+            NEW.model_name,
+            NEW.system,
+            NEW.id,
+            EXTRACT(EPOCH FROM (NEW.end_time - NEW.start_time)) * 1000,
+            COALESCE(NEW.total_tokens, 0),
+            NEW.time_to_first_token,
+            (NEW.error IS NULL),
+            NEW.user_id,
+            NEW.run_type
+        );
+    END IF;
 
     RETURN NEW;
 END;
@@ -538,3 +545,4 @@ ORDER BY view_name;
 
 -- 完成
 SELECT 'TimescaleDB initialization completed successfully!' AS status;
+SELECT 'Only LLM runs will be included in statistics (run_type = ''llm'' or NULL)' AS info;

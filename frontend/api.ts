@@ -42,7 +42,7 @@ export interface TimeseriesResponse {
 export interface TrendQuery {
     metric: "total_runs" | "successful_runs" | "failed_runs" | "error_rate" |
             "avg_duration_ms" | "p95_duration_ms" | "p99_duration_ms" |
-            "total_tokens" | "avg_tokens_per_run" | "avg_ttft_ms" | "distinct_users";
+            "total_tokens_sum" | "avg_tokens_per_run" | "avg_ttft_ms" | "distinct_users";
     period: "dod" | "wow" | "mom";
     start_time?: string;
     end_time?: string;
@@ -156,7 +156,7 @@ export interface SummaryResponse {
 // Analytics API Functions
 // ========================================
 
-const analyticsBaseUrl = "/v1/analytics";
+const analyticsBaseUrl = "/api/v1/analytics";
 
 export async function getTimeseries(query: TimeseriesQuery): Promise<TimeseriesResponse> {
     const params = new URLSearchParams();

@@ -9,7 +9,8 @@ import {
     getTimeseries,
     type TimeseriesQuery,
     type TimeseriesResponse,
-} from "../api";
+    fetch,
+} from "../api.js";
 import Chart from "../components/Chart.js";
 import { BarChart3, TrendingUp } from "lucide-solid";
 
@@ -177,7 +178,8 @@ const StatsPage = (): JSX.Element => {
                 granularity: "1h",
                 start_time: currentFilters.startTime.toISOString(),
                 end_time: currentFilters.endTime.toISOString(),
-                filters: Object.keys(filtersObj).length > 0 ? filtersObj : undefined,
+                filters:
+                    Object.keys(filtersObj).length > 0 ? filtersObj : undefined,
                 limit: 1000,
             };
 
@@ -185,51 +187,65 @@ const StatsPage = (): JSX.Element => {
             return response;
         } catch (err) {
             console.error("Failed to fetch timeseries data", err);
-            return { success: false, data: [], meta: { total: 0, limit: 1000, offset: 0 } };
+            return {
+                success: false,
+                data: [],
+                meta: { total: 0, limit: 1000, offset: 0 },
+            };
         }
     });
 
     // 按模型统计的趋势数据
-    const [modelTimeseriesData] = createResource(filters, async (currentFilters) => {
-        try {
-            const filtersObj: Record<string, string[]> = {};
-            if (currentFilters.system)
-                filtersObj.system = [currentFilters.system];
+    const [modelTimeseriesData] = createResource(
+        filters,
+        async (currentFilters) => {
+            try {
+                const filtersObj: Record<string, string[]> = {};
+                if (currentFilters.system)
+                    filtersObj.system = [currentFilters.system];
 
-            const query: TimeseriesQuery = {
-                dimension: "model_name",
-                metrics: [
-                    "total_runs",
-                    "successful_runs",
-                    "failed_runs",
-                    "error_rate",
-                    "avg_duration_ms",
-                    "p95_duration_ms",
-                    "p99_duration_ms",
-                    "total_tokens",
-                    "avg_tokens_per_run",
-                    "avg_ttft_ms",
-                ],
-                granularity: "1h",
-                start_time: currentFilters.startTime.toISOString(),
-                end_time: currentFilters.endTime.toISOString(),
-                filters: Object.keys(filtersObj).length > 0 ? filtersObj : undefined,
-                limit: 1000,
-            };
+                const query: TimeseriesQuery = {
+                    dimension: "model_name",
+                    metrics: [
+                        "total_runs",
+                        "successful_runs",
+                        "failed_runs",
+                        "error_rate",
+                        "avg_duration_ms",
+                        "p95_duration_ms",
+                        "p99_duration_ms",
+                        "total_tokens",
+                        "avg_tokens_per_run",
+                        "avg_ttft_ms",
+                    ],
+                    granularity: "1h",
+                    start_time: currentFilters.startTime.toISOString(),
+                    end_time: currentFilters.endTime.toISOString(),
+                    filters:
+                        Object.keys(filtersObj).length > 0
+                            ? filtersObj
+                            : undefined,
+                    limit: 1000,
+                };
 
-            const response = await getTimeseries(query);
-            return response;
-        } catch (err) {
-            console.error("Failed to fetch model timeseries data", err);
-            return { success: false, data: [], meta: { total: 0, limit: 1000, offset: 0 } };
-        }
-    });
+                const response = await getTimeseries(query);
+                return response;
+            } catch (err) {
+                console.error("Failed to fetch model timeseries data", err);
+                return {
+                    success: false,
+                    data: [],
+                    meta: { total: 0, limit: 1000, offset: 0 },
+                };
+            }
+        },
+    );
 
     const [availableFilters] = createResource(async () => {
         try {
             const [models, systems] = await Promise.all([
-                fetch("/trace/models").then(r => r.json()),
-                fetch("/trace/systems").then(r => r.json()),
+                fetch("/trace/models"),
+                fetch("/trace/systems"),
             ]);
             return {
                 modelNames: (models.model_names || []) as string[],
@@ -245,12 +261,13 @@ const StatsPage = (): JSX.Element => {
     const [selectedMetrics, setSelectedMetrics] = createSignal<string[]>([
         "total_runs",
         "p99_duration_ms",
-        "total_tokens",
+        "total_tokens_sum",
         "distinct_users",
     ]);
 
     // 按模型统计趋势的独立多选指标
-    const [selectedMetric, setSelectedMetric] = createSignal<string>("total_runs");
+    const [selectedMetric, setSelectedMetric] =
+        createSignal<string>("total_runs");
 
     const availableMetrics: {
         value: string;
@@ -267,9 +284,12 @@ const StatsPage = (): JSX.Element => {
         { value: "p99_duration_ms", label: "P99 持续时间 (s)", yAxisId: "y2" },
         { value: "avg_ttft_ms", label: "平均首包时间 (s)", yAxisId: "y3" },
         { value: "p95_ttft_ms", label: "P95 首包时间 (s)", yAxisId: "y3" },
-        { value: "total_tokens", label: "总 Token 数 (k)", yAxisId: "y4" },
-        { value: "avg_tokens", label: "平均 Token 数 (k)", yAxisId: "y4" },
-        { value: "avg_tokens_per_run", label: "平均 Token 数 (k)", yAxisId: "y4" },
+        { value: "total_tokens_sum", label: "总 Token 数 (k)", yAxisId: "y4" },
+        {
+            value: "avg_tokens_per_run",
+            label: "平均 Token 数 (k)",
+            yAxisId: "y4",
+        },
         { value: "distinct_users", label: "独立用户数", yAxisId: "y" },
     ];
 
@@ -422,7 +442,10 @@ const StatsPage = (): JSX.Element => {
         }
 
         // 按模型分组数据
-        const dataByModel = new Map<string, Array<{ time: string; value: number }>>();
+        const dataByModel = new Map<
+            string,
+            Array<{ time: string; value: number }>
+        >();
 
         data.forEach((d) => {
             const modelName = d.dimensions?.model_name || "未知模型";
@@ -451,7 +474,9 @@ const StatsPage = (): JSX.Element => {
                 label: modelName,
                 data: modelData.map((d) => d.value),
                 borderColor: color,
-                backgroundColor: color.replace("rgb", "rgba").replace(")", ", 0.5)"),
+                backgroundColor: color
+                    .replace("rgb", "rgba")
+                    .replace(")", ", 0.5)"),
                 tension: 0.1,
             });
             index++;
@@ -629,7 +654,8 @@ const StatsPage = (): JSX.Element => {
                             <div class="text-center p-8 text-gray-500">
                                 正在加载图表数据...
                             </div>
-                        ) : timeseriesData()?.data?.length && selectedMetrics().length ? (
+                        ) : timeseriesData()?.data?.length &&
+                          selectedMetrics().length ? (
                             <div class="h-full">
                                 <Chart
                                     type="line"
@@ -656,7 +682,9 @@ const StatsPage = (): JSX.Element => {
                                 onchange={(e) => handleMetricChange(e)}
                             >
                                 <option value="total_runs">总运行次数</option>
-                                <option value="successful_runs">成功次数</option>
+                                <option value="successful_runs">
+                                    成功次数
+                                </option>
                                 <option value="failed_runs">失败次数</option>
                                 <option value="error_rate">错误率</option>
                                 <option value="avg_duration_ms">
@@ -674,11 +702,8 @@ const StatsPage = (): JSX.Element => {
                                 <option value="p95_ttft_ms">
                                     P95 首包时间
                                 </option>
-                                <option value="total_tokens">
+                                <option value="total_tokens_sum">
                                     总 Token 数
-                                </option>
-                                <option value="avg_tokens">
-                                    平均 Token 数
                                 </option>
                                 <option value="avg_tokens_per_run">
                                     平均 Token 数
@@ -741,25 +766,57 @@ const StatsPage = (): JSX.Element => {
                                         {(item) => (
                                             <tr class="border-b border-gray-100">
                                                 <td class="px-4 py-2 text-gray-900">
-                                                    {new Date(item.time).toLocaleString()}
+                                                    {new Date(
+                                                        item.time,
+                                                    ).toLocaleString()}
                                                 </td>
                                                 <td class="px-4 py-2 text-gray-900">
-                                                    {(item.metrics.total_runs || 0).toLocaleString()}
+                                                    {(
+                                                        item.metrics
+                                                            .total_runs || 0
+                                                    ).toLocaleString()}
                                                 </td>
                                                 <td class="px-4 py-2 text-gray-600">
-                                                    {(item.metrics.successful_runs || 0).toLocaleString()} / {(item.metrics.failed_runs || 0).toLocaleString()}
+                                                    {(
+                                                        item.metrics
+                                                            .successful_runs ||
+                                                        0
+                                                    ).toLocaleString()}{" "}
+                                                    /{" "}
+                                                    {(
+                                                        item.metrics
+                                                            .failed_runs || 0
+                                                    ).toLocaleString()}
                                                 </td>
                                                 <td class="px-4 py-2 text-gray-900">
-                                                    {((item.metrics.error_rate || 0) * 100).toFixed(2)}%
+                                                    {(
+                                                        (item.metrics
+                                                            .error_rate || 0) *
+                                                        100
+                                                    ).toFixed(2)}
+                                                    %
                                                 </td>
                                                 <td class="px-4 py-2 text-gray-900">
-                                                    {((item.metrics.avg_duration_ms || 0) / 1000).toFixed(2)}s
+                                                    {(
+                                                        (item.metrics
+                                                            .avg_duration_ms ||
+                                                            0) / 1000
+                                                    ).toFixed(2)}
+                                                    s
                                                 </td>
                                                 <td class="px-4 py-2 text-gray-900">
-                                                    {((item.metrics.total_tokens_sum || 0) / 1000).toFixed(1)}k
+                                                    {(
+                                                        (item.metrics
+                                                            .total_tokens_sum ||
+                                                            0) / 1000
+                                                    ).toFixed(1)}
+                                                    k
                                                 </td>
                                                 <td class="px-4 py-2 text-gray-900">
-                                                    {(item.metrics.distinct_users || 0).toLocaleString()}
+                                                    {(
+                                                        item.metrics
+                                                            .distinct_users || 0
+                                                    ).toLocaleString()}
                                                 </td>
                                             </tr>
                                         )}

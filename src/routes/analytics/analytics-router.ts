@@ -66,7 +66,7 @@ const SummaryQuerySchema = z.object({
     filters: z.string().optional().transform((val) => val ? JSON.parse(val) : {}),
 });
 
-// 指标映射
+// 指标名称映射：前端指标 -> 数据库列名
 const METRIC_MAP: Record<string, string> = {
     total_runs: "total_runs",
     successful_runs: "successful_runs",
@@ -75,152 +75,59 @@ const METRIC_MAP: Record<string, string> = {
     avg_duration_ms: "avg_duration_ms",
     p95_duration_ms: "p95_duration_ms",
     p99_duration_ms: "p99_duration_ms",
-    total_tokens: "total_tokens_sum",
-    total_tokens_sum: "total_tokens_sum",
-    avg_tokens: "avg_tokens_per_run",
+    total_tokens: "total_tokens_sum",        // 映射到 total_tokens_sum
+    total_tokens_sum: "total_tokens_sum",    // 保留兼容
+    avg_tokens: "avg_tokens_per_run",        // 映射到 avg_tokens_per_run
     avg_tokens_per_run: "avg_tokens_per_run",
     avg_ttft_ms: "avg_ttft_ms",
     p95_ttft_ms: "p95_ttft_ms",
     distinct_users: "distinct_users",
 };
 
+// 连续聚合视图的分组配置
+const AGGREGATE_GROUPING: Record<string, string> = {
+    "run_stats_hourly": "(stat_hour, model_name, system)",
+    "run_stats_15min": "(stat_period, model_name, system)",
+    "run_stats_daily": "(stat_period, model_name, system)",
+    "run_stats_weekly": "(stat_period, model_name, system)",
+    "run_stats_monthly": "(stat_period, model_name, system)",
+};
+
+// 粒度到表名和列名的映射
+const GRANULARITY_CONFIG: Record<string, { table: string; timeColumn: string }> = {
+    "5min": { table: "run_stats_15min", timeColumn: "stat_period" },
+    "15min": { table: "run_stats_15min", timeColumn: "stat_period" },
+    "30min": { table: "run_stats_hourly", timeColumn: "stat_hour" },
+    "1h": { table: "run_stats_hourly", timeColumn: "stat_hour" },
+    "1d": { table: "run_stats_daily", timeColumn: "stat_period" },
+    "1w": { table: "run_stats_weekly", timeColumn: "stat_period" },
+    "1m": { table: "run_stats_monthly", timeColumn: "stat_period" },
+};
+
 export function createAnalyticsRouter(db: Kysely<Database>) {
     const app = new Hono();
-
-    // GET /api/v1/analytics/debug - 调试端点
-    app.get("/debug", async (c) => {
-        try {
-            // 检查连续聚合视图是否存在
-            const views = await sql`
-                SELECT view_name, materialized_only
-                FROM timescaledb_information.continuous_aggregates
-                ORDER BY view_name
-            `.execute(db);
-
-            // 检查各视图的行数
-            const stats = await sql`
-                SELECT
-                    'run_stats_raw' as table_name,
-                    COUNT(*) as row_count,
-                    MIN(stat_hour) as min_time,
-                    MAX(stat_hour) as max_time
-                FROM run_stats_raw
-                UNION ALL
-                SELECT
-                    'run_stats_hourly' as table_name,
-                    COUNT(*) as row_count,
-                    MIN(stat_hour) as min_time,
-                    MAX(stat_hour) as max_time
-                FROM run_stats_hourly
-                UNION ALL
-                SELECT
-                    'run_stats_15min' as table_name,
-                    COUNT(*) as row_count,
-                    MIN(stat_period) as min_time,
-                    MAX(stat_period) as max_time
-                FROM run_stats_15min
-            `.execute(db);
-
-            return c.json({
-                success: true,
-                data: {
-                    continuous_aggregates: views.rows,
-                    table_stats: stats.rows,
-                },
-            });
-        } catch (error: any) {
-            console.error("Error in /debug:", error);
-            return c.json({
-                success: false,
-                error: error.message,
-            }, 500);
-        }
-    });
-
-    // GET /api/v1/analytics/refresh - 刷新连续聚合视图
-    app.post("/refresh", async (c) => {
-        try {
-            const { view_name } = await c.req.json();
-
-            if (!view_name || !["run_stats_hourly", "run_stats_15min", "run_stats_daily", "run_stats_weekly", "run_stats_monthly"].includes(view_name)) {
-                return c.json({ error: "Invalid view_name" }, 400);
-            }
-
-            await sql`CALL refresh_continuous_aggregate(${sql.literal(view_name)}, window_start => NULL, window_end => NULL)`.execute(db);
-
-            return c.json({
-                success: true,
-                message: `Refreshed continuous aggregate view: ${view_name}`,
-            });
-        } catch (error: any) {
-            console.error("Error in /refresh:", error);
-            return c.json({
-                success: false,
-                error: error.message,
-            }, 500);
-        }
-    });
 
     // GET /api/v1/analytics/timeseries - 时序数据聚合
     app.get("/timeseries", async (c) => {
         try {
             const query = TimeseriesQuerySchema.parse(c.req.query());
 
-            // 目前只支持从 run_stats_raw 表查询
-            if (query.granularity !== "1h") {
-                return c.json({
-                    success: false,
-                    error: {
-                        code: "UNSUPPORTED_GRANULARITY",
-                        message: `Currently only '1h' granularity is supported`,
-                    },
-                }, 400);
-            }
+            // 根据粒度选择表和列名
+            const config = GRANULARITY_CONFIG[query.granularity];
+            const tableName = config.table;
+            const timeColumn = config.timeColumn;
 
-            const validMetrics = query.metrics.filter(m => METRIC_MAP[m]);
+            // 过滤并映射指标名称
+            const validMetrics = query.metrics
+                .filter(m => m !== "")
+                .map(m => METRIC_MAP[m] || m); // 使用映射后的列名
+
             const hasDimension = !!query.dimension;
             const dimensionColumn = query.dimension || "null";
 
-            // 构建 SELECT 子句
-            let selectClause = "time_bucket('1 hour', stat_hour) as time";
-            if (hasDimension) {
-                selectClause += `, ${dimensionColumn} as dimension_value`;
-            }
-
-            // 构建指标聚合
-            const metricClauses: string[] = [];
-            for (const metric of validMetrics) {
-                if (metric === "total_runs") {
-                    metricClauses.push("COUNT(*) as total_runs");
-                } else if (metric === "successful_runs") {
-                    metricClauses.push("COUNT(*) FILTER (WHERE is_success = true) as successful_runs");
-                } else if (metric === "failed_runs") {
-                    metricClauses.push("COUNT(*) FILTER (WHERE is_success = false) as failed_runs");
-                } else if (metric === "error_rate") {
-                    metricClauses.push("(COUNT(*) FILTER (WHERE is_success = false)::FLOAT / NULLIF(COUNT(*), 0)) as error_rate");
-                } else if (metric === "avg_duration_ms") {
-                    metricClauses.push("AVG(duration_ms) as avg_duration_ms");
-                } else if (metric === "p95_duration_ms") {
-                    metricClauses.push("percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) as p95_duration_ms");
-                } else if (metric === "p99_duration_ms") {
-                    metricClauses.push("percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) as p99_duration_ms");
-                } else if (metric === "total_tokens" || metric === "total_tokens_sum") {
-                    metricClauses.push("SUM(token_count) as total_tokens_sum");
-                } else if (metric === "avg_tokens" || metric === "avg_tokens_per_run") {
-                    metricClauses.push("AVG(token_count) as avg_tokens_per_run");
-                } else if (metric === "avg_ttft_ms") {
-                    metricClauses.push("AVG(ttft_ms) as avg_ttft_ms");
-                } else if (metric === "p95_ttft_ms") {
-                    metricClauses.push("percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) as p95_ttft_ms");
-                } else if (metric === "distinct_users") {
-                    metricClauses.push("COUNT(DISTINCT user_id) as distinct_users");
-                }
-            }
-
-            selectClause += ", " + metricClauses.join(", ");
-
             // 构建 WHERE 子句
             const whereConditions: string[] = [];
+
             if (query.filters.system?.length) {
                 whereConditions.push(`system IN ('${query.filters.system.join("','")}')`);
             }
@@ -228,37 +135,67 @@ export function createAnalyticsRouter(db: Kysely<Database>) {
                 whereConditions.push(`model_name IN ('${query.filters.model_name.join("','")}')`);
             }
             if (query.filters.user_id) {
-                whereConditions.push(`user_id = '${query.filters.user_id}'`);
+                // 连续聚合表中没有 user_id 维度，需要降级到 run_stats_raw
+                return c.json({
+                    success: false,
+                    error: {
+                        code: "UNSUPPORTED_FILTER",
+                        message: "Filtering by user_id is not supported with pre-aggregated data",
+                    },
+                }, 400);
             }
+
             if (query.start_time) {
-                whereConditions.push(`stat_hour >= '${new Date(query.start_time).toISOString()}'`);
+                whereConditions.push(`${timeColumn} >= '${new Date(query.start_time).toISOString()}'`);
             }
             if (query.end_time) {
-                whereConditions.push(`stat_hour <= '${new Date(query.end_time).toISOString()}'`);
+                whereConditions.push(`${timeColumn} <= '${new Date(query.end_time).toISOString()}'`);
             }
 
             const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
 
-            // 构建 GROUP BY 子句
-            let groupByClause = "GROUP BY time_bucket('1 hour', stat_hour)";
-            if (hasDimension) {
-                groupByClause += `, ${dimensionColumn}`;
-            }
-
             // 构建 ORDER BY 和 LIMIT
-            const orderByClause = "ORDER BY time";
+            const orderByClause = `ORDER BY ${timeColumn}`;
             const limitClause = `LIMIT ${query.limit} OFFSET ${query.offset}`;
 
-            // 完整的 SQL 查询字符串
-            const fullSql = `
-                SELECT
-                    ${selectClause}
-                FROM run_stats_raw
-                ${whereClause}
-                ${groupByClause}
-                ${orderByClause}
-                ${limitClause}
-            `;
+            // 构建指标聚合表达式
+            const metricClauses: string[] = validMetrics.map(metric => {
+                // 如果有维度分组，需要 SUM；否则直接选择
+                return hasDimension ? `SUM(${metric}) as ${metric}` : metric;
+            });
+
+            const metricSelect = metricClauses.join(", ");
+
+            // 完整的 SQL 查询字符串 - 直接查询，避免不必要的子查询
+            let fullSql: string;
+
+            if (hasDimension) {
+                // 有维度分组时：直接按时间和维度分组查询
+                fullSql = `
+                    SELECT
+                        ${timeColumn} as time,
+                        ${dimensionColumn} as dimension_value,
+                        ${metricSelect}
+                    FROM ${tableName}
+                    ${whereClause}
+                    GROUP BY ${timeColumn}, ${dimensionColumn}
+                    ${orderByClause}
+                    ${limitClause}
+                `;
+            } else {
+                // 无维度分组时：直接查询
+                fullSql = `
+                    SELECT
+                        ${timeColumn} as time,
+                        ${metricSelect}
+                    FROM ${tableName}
+                    ${whereClause}
+                    ${orderByClause}
+                    ${limitClause}
+                `;
+            }
+
+            console.log(`Executing analytics query on ${tableName}:`, fullSql);
 
             // 使用 sql.raw 执行原生 SQL
             const results = await sql.raw(fullSql).execute(db);
@@ -275,11 +212,14 @@ export function createAnalyticsRouter(db: Kysely<Database>) {
                     };
                 }
 
+                // 将数据库列名映射回前端指标名
                 item.metrics = {};
-                for (const metric of validMetrics) {
-                    const metricKey = metric === "total_tokens" || metric === "total_tokens_sum" ? "total_tokens_sum" : metric;
-                    item.metrics[metric] = row[metricKey] ?? null;
-                }
+                query.metrics.forEach(metric => {
+                    if (metric !== "") {
+                        const dbColumn = METRIC_MAP[metric] || metric;
+                        item.metrics[metric] = row[dbColumn] ?? null;
+                    }
+                });
 
                 return item;
             });
@@ -334,57 +274,46 @@ export function createAnalyticsRouter(db: Kysely<Database>) {
                     break;
             }
 
-            // 构建指标查询
-            let metricExpression = "";
-            switch (query.metric) {
-                case "total_runs":
-                    metricExpression = "COUNT(*)";
-                    break;
-                case "successful_runs":
-                    metricExpression = "COUNT(*) FILTER (WHERE is_success = true)";
-                    break;
-                case "failed_runs":
-                    metricExpression = "COUNT(*) FILTER (WHERE is_success = false)";
-                    break;
-                case "error_rate":
-                    metricExpression = "(COUNT(*) FILTER (WHERE is_success = false)::FLOAT / NULLIF(COUNT(*), 0))";
-                    break;
-                case "avg_duration_ms":
-                    metricExpression = "AVG(duration_ms)";
-                    break;
-                case "p95_duration_ms":
-                    metricExpression = "percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms)";
-                    break;
-                case "p99_duration_ms":
-                    metricExpression = "percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms)";
-                    break;
-                case "total_tokens":
-                    metricExpression = "SUM(token_count)";
-                    break;
-                case "avg_tokens_per_run":
-                    metricExpression = "AVG(token_count)";
-                    break;
-                case "avg_ttft_ms":
-                    metricExpression = "AVG(ttft_ms)";
-                    break;
-                case "distinct_users":
-                    metricExpression = "COUNT(DISTINCT user_id)";
-                    break;
-            }
+            // 映射指标名称
+            const dbMetric = METRIC_MAP[query.metric] || query.metric;
 
-            // 查询当前周期数据
+            // 根据指标类型确定聚合函数
+            // count 类指标使用 SUM, avg 和 百分位类指标使用 AVG
+            const countMetrics = [
+                "total_runs",
+                "successful_runs",
+                "failed_runs",
+                "total_tokens"
+            ];
+            const aggregateFunction = countMetrics.includes(query.metric) ? "SUM" : "AVG";
+
+            // 构建 WHERE 条件
+            const whereConditions: string[] = [];
+            if (query.filters.system?.length) {
+                whereConditions.push(`system IN ('${query.filters.system.join("','")}')`);
+            }
+            if (query.filters.model_name?.length) {
+                whereConditions.push(`model_name IN ('${query.filters.model_name.join("','")}')`);
+            }
+            const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
+
+            // 查询当前周期数据 - 使用聚合函数处理多个时间桶
             const currentSql = `
-                SELECT ${metricExpression} as value
-                FROM run_stats_raw
-                WHERE stat_hour >= '${startTime.toISOString()}' AND stat_hour <= '${endTime.toISOString()}'
+                SELECT COALESCE(${aggregateFunction}(${dbMetric}), 0) as value
+                FROM run_stats_hourly
+                ${whereClause}
+                AND stat_hour >= '${startTime.toISOString()}'
+                AND stat_hour <= '${endTime.toISOString()}'
             `;
             const currentResult = await sql.raw(currentSql).execute(db);
 
-            // 查询前一个周期数据
+            // 查询前一个周期数据 - 使用聚合函数处理多个时间桶
             const previousSql = `
-                SELECT ${metricExpression} as value
-                FROM run_stats_raw
-                WHERE stat_hour >= '${previousStartTime.toISOString()}' AND stat_hour <= '${previousEndTime.toISOString()}'
+                SELECT COALESCE(${aggregateFunction}(${dbMetric}), 0) as value
+                FROM run_stats_hourly
+                ${whereClause}
+                AND stat_hour >= '${previousStartTime.toISOString()}'
+                AND stat_hour <= '${previousEndTime.toISOString()}'
             `;
             const previousResult = await sql.raw(previousSql).execute(db);
 

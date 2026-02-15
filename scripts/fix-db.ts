@@ -173,12 +173,18 @@ async function main() {
         // 3. 创建触发器和函数
         console.log('🔧 Creating triggers and functions...\n');
 
-        // 3.1 创建更新统计数据的触发器函数
+        // 3.1 创建更新统计数据的触发器函数（支持 INSERT 和 UPDATE）
         console.log('Creating update_stats_raw() function...');
         await sql`
             CREATE OR REPLACE FUNCTION update_stats_raw()
             RETURNS TRIGGER AS $$
             BEGIN
+                IF TG_OP = 'UPDATE' THEN
+                    -- UPDATE 操作：先删除旧记录
+                    DELETE FROM run_stats_raw WHERE run_id = NEW.id;
+                END IF;
+
+                -- 插入新记录（支持 INSERT 和 UPDATE）
                 INSERT INTO run_stats_raw (
                     id,
                     stat_hour,
@@ -210,7 +216,7 @@ async function main() {
 
         console.log('  ✓ update_stats_raw() function created');
 
-        // 3.2 创建触发器
+        // 3.2 创建触发器（支持 INSERT 和 UPDATE）
         console.log('Creating trigger on runs...');
         await sql`
             DROP TRIGGER IF EXISTS trigger_update_stats_raw ON runs
@@ -218,7 +224,7 @@ async function main() {
 
         await sql`
             CREATE TRIGGER trigger_update_stats_raw
-            AFTER INSERT ON runs
+            AFTER INSERT OR UPDATE ON runs
             FOR EACH ROW
             EXECUTE FUNCTION update_stats_raw()
         `.execute(kysely);
@@ -229,7 +235,7 @@ async function main() {
         console.log('\n💡 Next steps:');
         console.log('   1. Restart your application');
         console.log('   2. Run "bun scripts/check-db.ts" to verify the fix');
-        console.log('   3. The system will now populate run_stats_raw for new runs');
+        console.log('   3. The system will now populate run_stats_raw for new runs and updates');
 
     } catch (error) {
         console.error('❌ Error fixing database:', error);

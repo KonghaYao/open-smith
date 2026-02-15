@@ -1,11 +1,29 @@
-import { createMemo, For, onMount } from "solid-js";
+import { createMemo, onMount } from "solid-js";
 import {
     Chart as ChartJS,
     type ChartConfiguration,
     type ChartEvent,
     type ChartTypeRegistry,
+    LinearScale,
+    CategoryScale,
+    LineController,
+    BarController,
+    PointElement,
+    LineElement,
+    BarElement,
 } from "chart.js";
 import type { Component } from "solid-js";
+
+// 注册所需的控制器、元素和 scale 类型
+ChartJS.register(
+    LinearScale,
+    CategoryScale,
+    LineController,
+    BarController,
+    PointElement,
+    LineElement,
+    BarElement,
+);
 
 // 简单的深合并函数
 function deepMerge(target: any, source: any): any {

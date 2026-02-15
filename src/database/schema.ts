@@ -42,6 +42,7 @@ export interface FeedbackTable {
     id: string;
     trace_id: string;
     run_id: string;
+    run_start_time: Date | null;
     feedback_id: string | null;
     score: number | null;
     comment: string | null;
@@ -53,6 +54,7 @@ export interface FeedbackTable {
 export interface AttachmentsTable {
     id: string;
     run_id: string;
+    run_start_time: Date | null;
     filename: string;
     content_type: string | null;
     file_size: number | null;
@@ -72,6 +74,7 @@ export interface RunStatsRawTable {
     ttft_ms: number | null;
     is_success: boolean;
     user_id: string | null;
+    run_type: string | null;
 }
 
 // Run Stats Hourly 表 (连续聚合视图)
