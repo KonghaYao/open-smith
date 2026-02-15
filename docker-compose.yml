@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: open-smith-db
+    environment:
+      POSTGRES_USER: open_smith
+      POSTGRES_PASSWORD: open_smith_password
+      POSTGRES_DB: open_smith
+      TIMESCALEDB_TELEMETRY: off
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U open_smith"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - open-smith-network
+
+  app:
+    build: .
+    container_name: open-smith-app
+    ports:
+      - "7765:7765"
+    environment:
+      TRACE_DATABASE_URL: postgresql://open_smith:open_smith_password@postgres:5432/open_smith
+      MASTER_KEY: ${MASTER_KEY:-change-me-to-a-secure-key}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./attachments:/app/attachments
+    restart: unless-stopped
+    networks:
+      - open-smith-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  open-smith-network:
+    driver: bridge

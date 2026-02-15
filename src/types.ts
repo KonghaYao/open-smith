@@ -11,12 +11,12 @@ export interface BaseRunRecord {
     user_id?: string; // 用户ID，来自 extra.metadata.user_id
     start_time: string;
     end_time: string;
-    inputs?: string; // JSON string
-    outputs?: string; // JSON string
-    events?: string; // JSON string
-    error?: string; // JSON string
-    extra?: string; // JSON string
-    serialized?: string; // JSON string
+    inputs?: Record<string, any>; // JSON Record<string,any>
+    outputs?: Record<string, any>; // JSON Record<string,any>
+    events?: Record<string, any>; // JSON Record<string,any>
+    error?: Record<string, any>; // JSON Record<string,any>
+    extra?: Record<string, any>; // JSON Record<string,any>
+    serialized?: Record<string, any>; // JSON Record<string,any>
     total_tokens?: number; // 新增字段：总 token 数
     model_name?: string; // 新增字段：模型名称
     time_to_first_token?: number; // 新增字段：首个 token 时间

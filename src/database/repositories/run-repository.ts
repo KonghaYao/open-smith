@@ -322,6 +322,7 @@ export class RunRepository {
 
         return runs.map((run) => ({
             ...run,
+            // 将 JSON 字符串解析为对象
             inputs: run.inputs ? JSON.parse(run.inputs) : undefined,
             outputs: run.outputs ? JSON.parse(run.outputs) : undefined,
             events: run.events ? JSON.parse(run.events) : undefined,
@@ -344,5 +345,317 @@ export class RunRepository {
             .executeTakeFirst();
 
         return (result.numDeletedRows ?? 0n) > 0n;
+    }
+
+    // 根据 trace_id 获取所有 runs
+    async getRunsByTraceId(traceId: string): Promise<RunRecord[]> {
+        const runs = await this.db
+            .selectFrom("runs")
+            .selectAll()
+            .where("trace_id", "=", traceId)
+            .orderBy("start_time", "desc")
+            .execute();
+
+        return runs.map((run) => ({
+            ...run,
+            // 将 JSON 字符串解析为对象
+            inputs: run.inputs ? run.inputs : undefined,
+            outputs: run.outputs ? run.outputs : undefined,
+            events: run.events ? run.events : undefined,
+            error: run.error ? run.error : undefined,
+            extra: run.extra ? run.extra : undefined,
+            serialized: run.serialized ? run.serialized : undefined,
+            tags: run.tags ? run.tags : undefined,
+            feedback_count: run.feedback_count || 0,
+            attachments_count: run.attachments_count || 0,
+            feedback: [],
+            attachments: [],
+        }));
+    }
+
+    // 根据 system 获取所有 runs
+    async getRunsBySystem(system: string): Promise<RunRecord[]> {
+        const runs = await this.db
+            .selectFrom("runs")
+            .selectAll()
+            .where("system", "=", system)
+            .orderBy("start_time", "desc")
+            .execute();
+
+        return runs.map((run) => ({
+            ...run,
+            // 将 JSON 字符串解析为对象
+            inputs: run.inputs ? JSON.parse(run.inputs) : undefined,
+            outputs: run.outputs ? JSON.parse(run.outputs) : undefined,
+            events: run.events ? JSON.parse(run.events) : undefined,
+            error: run.error ? JSON.parse(run.error) : undefined,
+            extra: run.extra ? JSON.parse(run.extra) : undefined,
+            serialized: run.serialized ? JSON.parse(run.serialized) : undefined,
+            tags: run.tags ? JSON.parse(run.tags) : undefined,
+            feedback_count: run.feedback_count || 0,
+            attachments_count: run.attachments_count || 0,
+            feedback: [],
+            attachments: [],
+        }));
+    }
+
+    // 根据 thread_id 获取所有 runs
+    async getRunsByThreadId(threadId: string): Promise<RunRecord[]> {
+        const runs = await this.db
+            .selectFrom("runs")
+            .selectAll()
+            .where("thread_id", "=", threadId)
+            .orderBy("start_time", "desc")
+            .execute();
+
+        return runs.map((run) => ({
+            ...run,
+            // 将 JSON 字符串解析为对象
+            inputs: run.inputs ? JSON.parse(run.inputs) : undefined,
+            outputs: run.outputs ? JSON.parse(run.outputs) : undefined,
+            events: run.events ? JSON.parse(run.events) : undefined,
+            error: run.error ? JSON.parse(run.error) : undefined,
+            extra: run.extra ? JSON.parse(run.extra) : undefined,
+            serialized: run.serialized ? JSON.parse(run.serialized) : undefined,
+            tags: run.tags ? JSON.parse(run.tags) : undefined,
+            feedback_count: run.feedback_count || 0,
+            attachments_count: run.attachments_count || 0,
+            feedback: [],
+            attachments: [],
+        }));
+    }
+
+    // 根据 user_id 获取所有 runs
+    async getRunsByUserId(userId: string): Promise<RunRecord[]> {
+        const runs = await this.db
+            .selectFrom("runs")
+            .selectAll()
+            .where("user_id", "=", userId)
+            .orderBy("start_time", "desc")
+            .execute();
+
+        return runs.map((run) => ({
+            ...run,
+            // 将 JSON 字符串解析为对象
+            inputs: run.inputs ? JSON.parse(run.inputs) : undefined,
+            outputs: run.outputs ? JSON.parse(run.outputs) : undefined,
+            events: run.events ? JSON.parse(run.events) : undefined,
+            error: run.error ? JSON.parse(run.error) : undefined,
+            extra: run.extra ? JSON.parse(run.extra) : undefined,
+            serialized: run.serialized ? JSON.parse(run.serialized) : undefined,
+            tags: run.tags ? JSON.parse(run.tags) : undefined,
+            feedback_count: run.feedback_count || 0,
+            attachments_count: run.attachments_count || 0,
+            feedback: [],
+            attachments: [],
+        }));
+    }
+
+    // 根据 run_type 获取 runs
+    async getRunsByRunType(
+        runType: string,
+        limit: number,
+        offset: number,
+    ): Promise<RunRecord[]> {
+        const runs = await this.db
+            .selectFrom("runs")
+            .selectAll()
+            .where("run_type", "=", runType)
+            .orderBy("start_time", "desc")
+            .limit(limit)
+            .offset(offset)
+            .execute();
+
+        return runs.map((run) => ({
+            ...run,
+            // 将 JSON 字符串解析为对象
+            inputs: run.inputs ? JSON.parse(run.inputs) : undefined,
+            outputs: run.outputs ? JSON.parse(run.outputs) : undefined,
+            events: run.events ? JSON.parse(run.events) : undefined,
+            error: run.error ? JSON.parse(run.error) : undefined,
+            extra: run.extra ? JSON.parse(run.extra) : undefined,
+            serialized: run.serialized ? JSON.parse(run.serialized) : undefined,
+            tags: run.tags ? JSON.parse(run.tags) : undefined,
+            feedback_count: run.feedback_count || 0,
+            attachments_count: run.attachments_count || 0,
+            feedback: [],
+            attachments: [],
+        }));
+    }
+
+    // 根据 run_type 统计数量
+    async countRunsByRunType(runType: string): Promise<number> {
+        const result = await this.db
+            .selectFrom("runs")
+            .select(({ fn }) => [fn.count<number>("id").as("count")])
+            .where("run_type", "=", runType)
+            .executeTakeFirst();
+
+        return Number(result?.count ?? 0);
+    }
+
+    // 根据条件获取 runs
+    async getRunsByConditions(
+        conditions: {
+            run_type?: string;
+            system?: string;
+            model_name?: string;
+            thread_id?: string;
+            user_id?: string;
+            tag?: string;
+            start_time_after?: string;
+            start_time_before?: string;
+        },
+        limit: number,
+        offset: number,
+    ): Promise<RunRecord[]> {
+        let query = this.db
+            .selectFrom("runs")
+            .selectAll()
+            .orderBy("start_time", "desc")
+            .limit(limit)
+            .offset(offset);
+
+        if (conditions.run_type) {
+            query = query.where("run_type", "=", conditions.run_type);
+        }
+        if (conditions.system) {
+            query = query.where("system", "=", conditions.system);
+        }
+        if (conditions.model_name) {
+            query = query.where("model_name", "=", conditions.model_name);
+        }
+        if (conditions.thread_id) {
+            query = query.where("thread_id", "=", conditions.thread_id);
+        }
+        if (conditions.user_id) {
+            query = query.where("user_id", "=", conditions.user_id);
+        }
+        if (conditions.tag) {
+            query = query.where("tags", "like", `%${conditions.tag}%`);
+        }
+        if (conditions.start_time_after) {
+            query = query.where(
+                "start_time",
+                ">=",
+                new Date(conditions.start_time_after),
+            );
+        }
+        if (conditions.start_time_before) {
+            query = query.where(
+                "start_time",
+                "<=",
+                new Date(conditions.start_time_before),
+            );
+        }
+
+        const runs = await query.execute();
+
+        return runs.map((run) => ({
+            ...run,
+            // 将 JSON 字符串解析为对象
+            inputs: run.inputs ? JSON.parse(run.inputs) : undefined,
+            outputs: run.outputs ? JSON.parse(run.outputs) : undefined,
+            events: run.events ? JSON.parse(run.events) : undefined,
+            error: run.error ? JSON.parse(run.error) : undefined,
+            extra: run.extra ? JSON.parse(run.extra) : undefined,
+            serialized: run.serialized ? JSON.parse(run.serialized) : undefined,
+            tags: run.tags ? JSON.parse(run.tags) : undefined,
+            feedback_count: run.feedback_count || 0,
+            attachments_count: run.attachments_count || 0,
+            feedback: [],
+            attachments: [],
+        }));
+    }
+
+    // 根据条件统计 runs 数量
+    async countRunsByConditions(conditions: {
+        run_type?: string;
+        system?: string;
+        model_name?: string;
+        thread_id?: string;
+        user_id?: string;
+        tag?: string;
+        start_time_after?: string;
+        start_time_before?: string;
+    }): Promise<number> {
+        let query = this.db
+            .selectFrom("runs")
+            .select(({ fn }) => [fn.count<number>("id").as("count")]);
+
+        if (conditions.run_type) {
+            query = query.where("run_type", "=", conditions.run_type);
+        }
+        if (conditions.system) {
+            query = query.where("system", "=", conditions.system);
+        }
+        if (conditions.model_name) {
+            query = query.where("model_name", "=", conditions.model_name);
+        }
+        if (conditions.thread_id) {
+            query = query.where("thread_id", "=", conditions.thread_id);
+        }
+        if (conditions.user_id) {
+            query = query.where("user_id", "=", conditions.user_id);
+        }
+        if (conditions.tag) {
+            query = query.where("tags", "like", `%${conditions.tag}%`);
+        }
+        if (conditions.start_time_after) {
+            query = query.where(
+                "start_time",
+                ">=",
+                new Date(conditions.start_time_after),
+            );
+        }
+        if (conditions.start_time_before) {
+            query = query.where(
+                "start_time",
+                "<=",
+                new Date(conditions.start_time_before),
+            );
+        }
+
+        const result = await query.executeTakeFirst();
+        return Number(result?.count ?? 0);
+    }
+
+    // 获取所有 thread_ids
+    async getAllThreadIds(): Promise<string[]> {
+        const result = await this.db
+            .selectFrom("runs")
+            .select("thread_id")
+            .where("thread_id", "is not", null)
+            .where("thread_id", "!=", "")
+            .groupBy("thread_id")
+            .execute();
+
+        return result.map((row) => row.thread_id!).filter(Boolean);
+    }
+
+    // 获取所有 user_ids
+    async getAllUserIds(): Promise<string[]> {
+        const result = await this.db
+            .selectFrom("runs")
+            .select("user_id")
+            .where("user_id", "is not", null)
+            .where("user_id", "!=", "")
+            .groupBy("user_id")
+            .execute();
+
+        return result.map((row) => row.user_id!).filter(Boolean);
+    }
+
+    // 获取所有 model_names
+    async getAllModelNames(): Promise<string[]> {
+        const result = await this.db
+            .selectFrom("runs")
+            .select("model_name")
+            .where("model_name", "is not", null)
+            .where("model_name", "!=", "")
+            .groupBy("model_name")
+            .execute();
+
+        return result.map((row) => row.model_name!).filter(Boolean);
     }
 }
