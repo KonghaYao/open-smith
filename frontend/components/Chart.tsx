@@ -68,71 +68,125 @@ interface BaseChartProps {
 const Chart: Component<BaseChartProps> = (props) => {
     let chartRef: HTMLCanvasElement | undefined;
     let chartInstance: ChartJS | undefined;
+    let isInitialized = false;
 
-    onMount(() => {
-        if (chartRef) {
-            const ctx = chartRef.getContext("2d");
-            if (!ctx) return;
+    const initializeChart = () => {
+        if (isInitialized || !chartRef) {
+            console.log('Chart component - Skipping initialization, isInitialized:', isInitialized, 'chartRef:', !!chartRef);
+            return;
+        }
 
-            const defaultOptions = {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: "top" as const,
-                    },
-                    tooltip: {
-                        mode: "index" as const,
-                        intersect: false,
+        const ctx = chartRef.getContext("2d");
+        if (!ctx) {
+            console.error('Chart component - Failed to get 2d context');
+            return;
+        }
+
+        const defaultOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: "top" as const,
+                },
+                tooltip: {
+                    mode: "index" as const,
+                    intersect: false,
+                },
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false,
                     },
                 },
-                scales: {
-                    x: {
-                        grid: {
-                            display: false,
-                        },
-                    },
-                    y: {
-                        beginAtZero: true,
-                    },
+                y: {
+                    beginAtZero: true,
                 },
-            };
+            },
+        };
 
-            const finalOptions = deepMerge(defaultOptions, props.options || {});
+        const finalOptions = deepMerge(defaultOptions, props.options || {});
 
+        console.log('Chart component - Creating ChartJS instance with type:', props.type);
+        console.log('Chart component - Data:', props.data);
+        console.log('Chart component - Options:', finalOptions);
+
+        try {
             chartInstance = new ChartJS(ctx, {
                 type: props.type,
                 data: props.data,
                 options: finalOptions,
             });
+            isInitialized = true;
+            console.log('Chart component - ChartJS instance created successfully');
 
             if (props.onClick) {
                 chartInstance.options.onClick = (event, elements) => {
                     props.onClick!(event, elements);
                 };
             }
+        } catch (error) {
+            console.error('Chart component - Failed to create ChartJS instance:', error);
         }
+    };
+
+    onMount(() => {
+        console.log('Chart component - onMount called');
+        console.log('Chart component - chartRef:', chartRef);
+        console.log('Chart component - props.type:', props.type);
+        console.log('Chart component - props.data:', props.data);
+
+        // 使用 requestAnimationFrame 确保 DOM 已完全渲染
+        requestAnimationFrame(() => {
+            // 检查数据是否有效（有标签和数据集）
+            const hasValidData = props.data && props.data.labels && props.data.labels.length > 0;
+
+            if (hasValidData) {
+                console.log('Chart component - Data is valid, initializing chart');
+                initializeChart();
+            } else {
+                console.log('Chart component - Data is not ready, waiting for data update');
+            }
+        });
 
         return () => {
             if (chartInstance) {
                 chartInstance.destroy();
+                chartInstance = undefined;
+                isInitialized = false;
             }
         };
     });
 
     // 响应式更新
     createMemo(() => {
-        if (chartInstance && props.data) {
-            console.log('Chart component - updating data:', props.data);
-            chartInstance.data = props.data;
+        const data = props.data;
+        console.log('Chart component - createMemo triggered');
+        console.log('Chart component - isInitialized:', isInitialized);
+        console.log('Chart component - current data:', data);
+
+        if (isInitialized && chartInstance) {
+            // 如果图表已存在，更新它
+            console.log('Chart component - Updating existing chart');
+            chartInstance.data = data;
             if (props.options) {
                 chartInstance.options = deepMerge(
                     chartInstance.options,
                     props.options,
                 );
             }
-            console.log('Chart component - calling update()');
             chartInstance.update();
+        } else if (data && data.labels && data.labels.length > 0 && chartRef) {
+            // 如果图表不存在但数据有效，初始化图表
+            console.log('Chart component - No chart instance but data is valid, creating chart');
+            requestAnimationFrame(() => {
+                if (!isInitialized) {
+                    initializeChart();
+                }
+            });
+        } else {
+            console.log('Chart component - Skipping chart creation: no data or chartRef');
         }
     });
 

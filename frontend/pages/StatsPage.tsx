@@ -324,7 +324,7 @@ const StatsPage = (): JSX.Element => {
 
     // 修改图表数据生成逻辑以支持多指标
     const chartData = createMemo(() => {
-        const data = timeseriesData()?.data || [];
+        const data = timeseriesData?.()?.data || [];
         const metrics = selectedMetrics();
 
         console.log("chartData - data:", data);
@@ -443,7 +443,7 @@ const StatsPage = (): JSX.Element => {
     });
 
     const newModelChartData = createMemo(() => {
-        const data = modelTimeseriesData()?.data || [];
+        const data = modelTimeseriesData?.()?.data || [];
         const metric = selectedMetric();
 
         if (!data.length) {
@@ -667,7 +667,7 @@ const StatsPage = (): JSX.Element => {
                             <div class="text-center p-8 text-gray-500">
                                 正在加载图表数据...
                             </div>
-                        ) : timeseriesData()?.data?.length &&
+                        ) : chartData().labels.length > 0 &&
                           selectedMetrics().length ? (
                             <div class="h-full">
                                 <Chart
@@ -742,7 +742,7 @@ const StatsPage = (): JSX.Element => {
                 </div>
 
                 {/* Data Table */}
-                {timeseriesData()?.data?.length > 0 && (
+                {timeseriesData?.()?.data?.length > 0 && (
                     <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
                         <h2 class="text-lg font-semibold text-gray-700 mb-3">
                             数据详情
@@ -775,7 +775,7 @@ const StatsPage = (): JSX.Element => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <For each={timeseriesData()?.data || []}>
+                                    <For each={timeseriesData?.()?.data || []}>
                                         {(item) => (
                                             <tr class="border-b border-gray-100">
                                                 <td class="px-4 py-2 text-gray-900">

@@ -4,6 +4,7 @@ import {
     For,
     type JSX,
     createMemo,
+    createEffect,
 } from "solid-js";
 import { getTimeseries, type TimeseriesQuery } from "../api.js";
 import Chart from "../components/Chart.js";
@@ -99,6 +100,7 @@ const CostAnalysis = (): JSX.Element => {
 
     // 总体成本趋势
     const [totalCostData] = createResource(selectedTimeRange, async (timeRange) => {
+        console.log('CostAnalysis - Fetching total cost data for timeRange:', timeRange);
         try {
             const startTime = getStartTime(timeRange);
 
@@ -112,15 +114,17 @@ const CostAnalysis = (): JSX.Element => {
             };
 
             const response = await getTimeseries(query);
+            console.log('CostAnalysis - Total cost data response:', response);
             return response;
         } catch (err) {
-            console.error("Failed to fetch total cost data", err);
+            console.error("CostAnalysis - Failed to fetch total cost data", err);
             return { success: false, data: [], meta: { total: 0, limit: 1000, offset: 0 } };
         }
     });
 
     // 按模型分组的成本
     const [modelCostData] = createResource(selectedTimeRange, async (timeRange) => {
+        console.log('CostAnalysis - Fetching model cost data for timeRange:', timeRange);
         try {
             const startTime = getStartTime(timeRange);
 
@@ -134,15 +138,17 @@ const CostAnalysis = (): JSX.Element => {
             };
 
             const response = await getTimeseries(query);
+            console.log('CostAnalysis - Model cost data response:', response);
             return response;
         } catch (err) {
-            console.error("Failed to fetch model cost data", err);
+            console.error("CostAnalysis - Failed to fetch model cost data", err);
             return { success: false, data: [], meta: { total: 0, limit: 1000, offset: 0 } };
         }
     });
 
     // 按系统分组的成本
     const [systemCostData] = createResource(selectedTimeRange, async (timeRange) => {
+        console.log('CostAnalysis - Fetching system cost data for timeRange:', timeRange);
         try {
             const startTime = getStartTime(timeRange);
 
@@ -156,9 +162,10 @@ const CostAnalysis = (): JSX.Element => {
             };
 
             const response = await getTimeseries(query);
+            console.log('CostAnalysis - System cost data response:', response);
             return response;
         } catch (err) {
-            console.error("Failed to fetch system cost data", err);
+            console.error("CostAnalysis - Failed to fetch system cost data", err);
             return { success: false, data: [], meta: { total: 0, limit: 1000, offset: 0 } };
         }
     });
@@ -187,16 +194,30 @@ const CostAnalysis = (): JSX.Element => {
 
     // 总体成本趋势图表
     const totalCostChartData = createMemo(() => {
-        const data = totalCostData()?.data || [];
-        if (!data.length) return { labels: [], datasets: [] };
+        console.log('CostAnalysis - Computing total cost chart data');
+        const data = totalCostData?.()?.data || [];
+        console.log('CostAnalysis - Total cost raw data:', data);
 
-        const labels = data.map((d) => new Date(d.time).toLocaleDateString());
-        const costs = data.map((d) => {
+        if (!data.length) {
+            console.log('CostAnalysis - No total cost data available');
+            return { labels: [], datasets: [] };
+        }
+
+        // 按日期汇总成本（处理同一天的多条记录）
+        const dailyCosts = new Map<string, number>();
+        data.forEach((d) => {
+            const date = new Date(d.time).toLocaleDateString();
             const tokens = Number(d.metrics.total_tokens_sum || 0);
-            return (tokens * 0.002) / 1000;
+            const cost = (tokens * 0.002) / 1000;
+            dailyCosts.set(date, (dailyCosts.get(date) || 0) + cost);
         });
 
-        return {
+        const labels = Array.from(dailyCosts.keys()).sort((a, b) => {
+            return new Date(a).getTime() - new Date(b).getTime();
+        });
+        const costs = labels.map(date => dailyCosts.get(date) || 0);
+
+        const chartData = {
             labels,
             datasets: [
                 {
@@ -209,6 +230,9 @@ const CostAnalysis = (): JSX.Element => {
                 },
             ],
         };
+
+        console.log('CostAnalysis - Total cost chart data:', chartData);
+        return chartData;
     });
 
     const totalCostChartOptions = createMemo(() => ({
@@ -248,7 +272,9 @@ const CostAnalysis = (): JSX.Element => {
 
     // 按模型成本分布图表
     const modelCostChartData = createMemo(() => {
-        const data = modelCostData()?.data || [];
+        console.log('CostAnalysis - Computing model cost chart data');
+        const data = modelCostData?.()?.data || [];
+        console.log('CostAnalysis - Model cost raw data:', data);
 
         // 按模型汇总成本，过滤掉模型名称为 null 的记录
         const modelCosts = new Map<string, number>();
@@ -269,6 +295,7 @@ const CostAnalysis = (): JSX.Element => {
         const entries = Array.from(modelCosts.entries()).filter(([_, cost]) => cost > 0);
 
         if (entries.length === 0) {
+            console.log('CostAnalysis - No model cost data available');
             return { labels: ["暂无数据"], datasets: [{ label: "成本 (USD)", data: [0], backgroundColor: ["rgb(200, 200, 200)"] }] };
         }
 
@@ -284,7 +311,7 @@ const CostAnalysis = (): JSX.Element => {
             "rgb(236, 72, 153)",
         ];
 
-        return {
+        const chartData = {
             labels,
             datasets: [
                 {
@@ -296,6 +323,9 @@ const CostAnalysis = (): JSX.Element => {
                 },
             ],
         };
+
+        console.log('CostAnalysis - Model cost chart data:', chartData);
+        return chartData;
     });
 
     const modelCostChartOptions = createMemo(() => ({
@@ -355,6 +385,13 @@ const CostAnalysis = (): JSX.Element => {
                 .map(d => d.dimensions?.model_name)
                 .filter(m => m !== null && m !== undefined)
         ).size;
+    });
+
+    // 调试：监听数据变化
+    createEffect(() => {
+        console.log('CostAnalysis - Total cost data loaded:', totalCostData());
+        console.log('CostAnalysis - Model cost data loaded:', modelCostData());
+        console.log('CostAnalysis - System cost data loaded:', systemCostData());
     });
 
     return (
@@ -421,11 +458,17 @@ const CostAnalysis = (): JSX.Element => {
                 <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
                     <h2 class="text-lg font-semibold text-gray-700 mb-4">成本趋势</h2>
                     <div class="h-80">
-                        <Chart
-                            type="line"
-                            data={totalCostChartData()}
-                            options={totalCostChartOptions()}
-                        />
+                        {totalCostChartData().labels.length > 0 ? (
+                            <Chart
+                                type="line"
+                                data={totalCostChartData()}
+                                options={totalCostChartOptions()}
+                            />
+                        ) : (
+                            <div class="flex items-center justify-center h-full text-gray-500">
+                                暂无成本趋势数据
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -434,11 +477,17 @@ const CostAnalysis = (): JSX.Element => {
                     <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
                         <h2 class="text-lg font-semibold text-gray-700 mb-4">按模型成本分布</h2>
                         <div class="h-80">
-                            <Chart
-                                type="doughnut"
-                                data={modelCostChartData()}
-                                options={modelCostChartOptions()}
-                            />
+                            {modelCostChartData().labels.length > 1 || (modelCostChartData().labels.length === 1 && modelCostChartData().datasets[0].data[0] > 0) ? (
+                                <Chart
+                                    type="doughnut"
+                                    data={modelCostChartData()}
+                                    options={modelCostChartOptions()}
+                                />
+                            ) : (
+                                <div class="flex items-center justify-center h-full text-gray-500">
+                                    暂无模型成本数据
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -456,22 +505,30 @@ const CostAnalysis = (): JSX.Element => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <For each={systemCostTable()}>
-                                        {(item) => (
-                                            <tr class="border-b border-gray-100">
-                                                <td class="px-4 py-2 text-gray-900">{item.system}</td>
-                                                <td class="px-4 py-2 text-right text-gray-900">
-                                                    ${item.cost.toFixed(6)}
-                                                </td>
-                                                <td class="px-4 py-2 text-right text-gray-600">
-                                                    {item.runs.toLocaleString()}
-                                                </td>
-                                                <td class="px-4 py-2 text-right text-gray-600">
-                                                    ${item.avgCostPerRun.toFixed(8)}
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </For>
+                                    {systemCostTable().length > 0 ? (
+                                        <For each={systemCostTable()}>
+                                            {(item) => (
+                                                <tr class="border-b border-gray-100">
+                                                    <td class="px-4 py-2 text-gray-900">{item.system}</td>
+                                                    <td class="px-4 py-2 text-right text-gray-900">
+                                                        ${item.cost.toFixed(6)}
+                                                    </td>
+                                                    <td class="px-4 py-2 text-right text-gray-600">
+                                                        {item.runs.toLocaleString()}
+                                                    </td>
+                                                    <td class="px-4 py-2 text-right text-gray-600">
+                                                        ${item.avgCostPerRun.toFixed(8)}
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </For>
+                                    ) : (
+                                        <tr>
+                                            <td colspan="4" class="px-4 py-8 text-center text-gray-500">
+                                                暂无系统成本数据
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
