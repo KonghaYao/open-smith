@@ -42,3 +42,106 @@ To use PostgreSQL, add the following to your `.env` file:
 TRACE_DATABASE_URL=postgresql://postgres:postgres@localhost:5434/open_smith
 MASTER_KEY=test-test
 ```
+
+### Docker Compose
+
+You can run open-smith with TimescaleDB using Docker Compose. Choose the appropriate configuration:
+
+#### Production (Pre-built Image)
+
+Use the pre-built Docker image from GitHub Container Registry:
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg17
+    container_name: open-smith-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: open_smith
+    ports:
+      - "5434:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  open-smith:
+    image: ghcr.io/konghayao/open-smith:1.0.1
+    container_name: open-smith-app
+    environment:
+      NODE_ENV: production
+      PORT: 7765
+      TRACE_DATABASE_URL: postgresql://postgres:postgres@timescaledb:5432/open_smith
+      MASTER_KEY: ${MASTER_KEY:-change-this-to-a-secure-key}
+    ports:
+      - "7765:7765"
+    volumes:
+      - attachments_data:/app/attachments
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  timescaledb_data:
+  attachments_data:
+```
+
+**Usage:**
+
+```bash
+# Set your master key
+export MASTER_KEY=your-secure-master-key
+
+# Start services
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop services
+docker compose down
+```
+
+#### Development (Local Build)
+
+To build from source:
+
+```bash
+# Clone repository
+git clone https://github.com/konghayao/open-smith.git
+cd open-smith
+
+# Start services
+docker compose up -d
+```
+
+**Configuration Options:**
+
+- `MASTER_KEY`: Required. Set your master admin key for system management
+- `TRACE_DATABASE_URL`: PostgreSQL connection string. Comment out to use SQLite
+- Port mapping: Open Smith defaults to `7765`, TimescaleDB to `5434`
+
+**Access URLs:**
+
+- API: `http://localhost:7765`
+- GUI Admin: `http://localhost:7765/ui/index.html`
+
+**Client Configuration:**
+
+Configure your LangGraph/LangChain project:
+
+```sh
+LANGSMITH_ENDPOINT="http://localhost:7765"
+LANGSMITH_API_KEY="lsv2_ts"  # Create key via Admin GUI
+```
+
