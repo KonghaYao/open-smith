@@ -221,7 +221,7 @@ export class SystemRepository {
             .select((eb) => [
                 eb.fn.count("id").as("total_runs"),
                 eb.fn.count("trace_id").filterWhere("trace_id", "is not", null).distinct().as("total_traces"),
-                eb.fn.coalesce(eb.fn.sum("total_tokens"), sql`0`).as("total_tokens"),
+                eb.fn.coalesce(eb.fn.sum("total_tokens"), sql<number>`0`).as("total_tokens"),
                 eb.fn.min("start_time").as("first_run_time"),
                 eb.fn.max("start_time").as("last_run_time"),
             ])

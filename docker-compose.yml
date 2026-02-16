@@ -1,48 +1,46 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: timescale/timescaledb:latest-pg16
+  # Optional: TimescaleDB for production
+  timescaledb:
+    image: timescale/timescaledb:latest-pg17
     container_name: open-smith-db
     environment:
-      POSTGRES_USER: open_smith
-      POSTGRES_PASSWORD: open_smith_password
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: open_smith
-      TIMESCALEDB_TELEMETRY: off
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - timescaledb_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U open_smith"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
-    networks:
-      - open-smith-network
 
-  app:
-    build: .
+  # Open Smith application
+  open-smith:
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: open-smith-app
+    environment:
+      NODE_ENV: production
+      PORT: 7765
+      # Use TimescaleDB or SQLite (comment out to use SQLite)
+      TRACE_DATABASE_URL: postgresql://postgres:postgres@timescaledb:5432/open_smith
+      # Required: Set your master key
+      MASTER_KEY: ${MASTER_KEY:-change-this-to-a-secure-key}
     ports:
       - "7765:7765"
-    environment:
-      TRACE_DATABASE_URL: postgresql://open_smith:open_smith_password@postgres:5432/open_smith
-      MASTER_KEY: ${MASTER_KEY:-change-me-to-a-secure-key}
-    depends_on:
-      postgres:
-        condition: service_healthy
     volumes:
-      - ./attachments:/app/attachments
+      - attachments_data:/app/attachments
+    depends_on:
+      timescaledb:
+        condition: service_healthy
     restart: unless-stopped
-    networks:
-      - open-smith-network
 
-volumes:
-  postgres_data:
-    driver: local
-
-networks:
-  open-smith-network:
-    driver: bridge
+volumesolumes:
+  timescaledb_data:
+  attachments_data:

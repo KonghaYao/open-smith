@@ -3,24 +3,24 @@
 /** Run 的基本类型 */
 export interface BaseRunRecord {
     id: string;
-    trace_id?: string;
-    name: string;
-    run_type?: string;
-    system?: string; // 系统标识，来自 x-api-key
-    thread_id?: string; // 线程ID，来自 extra.metadata.thread_id
-    user_id?: string; // 用户ID，来自 extra.metadata.user_id
-    start_time: string;
-    end_time: string;
-    inputs?: Record<string, any>; // JSON Record<string,any>
-    outputs?: Record<string, any>; // JSON Record<string,any>
-    events?: Record<string, any>; // JSON Record<string,any>
-    error?: Record<string, any>; // JSON Record<string,any>
-    extra?: Record<string, any>; // JSON Record<string,any>
+    trace_id?: string | null;
+    name: string | null;
+    run_type?: string | null;
+    system?: string | null; // 系统标识，来自 x-api-key
+    thread_id?: string | null; // 线程ID，来自 extra.metadata.thread_id
+    user_id?: string | null; // 用户ID，来自 extra.metadata.user_id
+    start_time: Date | null;
+    end_time: Date | null;
+    inputs?: Record<string, any> | null; // JSON Record<string,any>
+    outputs?: Record<string, any> | null; // JSON Record<string,any>
+    events?: Record<string, any> | null; // JSON Record<string,any>
+    error?: Record<string, any> | null; // JSON Record<string,any>
+    extra?: Record<string, any> | null; // JSON Record<string,any>
     serialized?: Record<string, any>; // JSON Record<string,any>
-    total_tokens?: number; // 新增字段：总 token 数
-    model_name?: string; // 新增字段：模型名称
-    time_to_first_token?: number; // 新增字段：首个 token 时间
-    tags?: string; // 新增字段：标签数组，存储为JSON字符串
+    total_tokens?: number | null; // 新增字段：总 token 数
+    model_name?: string | null; // 新增字段：模型名称
+    time_to_first_token?: number | null; // 新增字段：首个 token 时间
+    tags?: string | null; // 新增字段：标签数组，存储为JSON字符串
     created_at: string;
     updated_at: string;
 }

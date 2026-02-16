@@ -28,7 +28,7 @@ const app = new Hono();
 
 // 使用 Kysely 创建数据库实例
 let kysely = await createKyselyInstance({
-    connectionString: process.env.TRACE_DATABASE_URL,
+    connectionString: process.env.TRACE_DATABASE_URL!,
 });
 
 const db = new TraceDatabase(kysely);

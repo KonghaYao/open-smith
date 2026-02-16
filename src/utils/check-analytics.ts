@@ -7,30 +7,32 @@ import { sql } from "kysely";
 
 export async function checkAnalyticsStatus() {
     const kysely = await createKyselyInstance({
-        connectionString: process.env.TRACE_DATABASE_URL,
+        connectionString: process.env.TRACE_DATABASE_URL!,
     });
 
     console.log("=== Analytics API 诊断工具 ===\n");
 
     // 1. 检查 runs 表数据
     console.log("1. 检查 runs 表数据...");
-    const runsResult = await sql`SELECT COUNT(*) as count, MIN(start_time) as first_run, MAX(start_time) as last_run FROM runs`.execute(kysely);
+    const runsResult = await sql<{ count: number; first_run: Date; last_run: Date }>`
+        SELECT COUNT(*) as count, MIN(start_time) as first_run, MAX(start_time) as last_run FROM runs
+    `.execute(kysely);
     console.log(`   Runs 总数: ${runsResult.rows[0]?.count || 0}`);
-    console.log(`   首条记录: ${runsResult.rows[0]?.first_run || '无'}`);
-    console.log(`   最新记录: ${runsResult.rows[0]?.last_run || '无'}\n`);
+    console.log(`   首条记录: ${runsResult.rows[0]?.first_run || "无"}`);
+    console.log(`   最新记录: ${runsResult.rows[0]?.last_run || "无"}\n`);
 
     // 2. 检查连续聚合视图结构
     console.log("2. 检查 continuous_aggregates 视图结构...");
     try {
         // 先查询视图的列
-        const columnsResult = await sql`
+        const columnsResult = await sql<{ column_name: string; data_type: string }>`
             SELECT column_name, data_type
             FROM information_schema.columns
             WHERE table_name = 'continuous_aggregates'
             AND table_schema = 'timescaledb_information'
         `.execute(kysely);
         console.log("   continuous_aggregates 视图列:");
-        columnsResult.rows.forEach((row: any) => {
+        columnsResult.rows.forEach((row) => {
             console.log(`   - ${row.column_name}: ${row.data_type}`);
         });
     } catch (error: any) {
@@ -41,7 +43,9 @@ export async function checkAnalyticsStatus() {
     // 3. 检查连续聚合视图数据
     console.log("3. 检查 continuous_aggregates 数据...");
     try {
-        const viewsResult = await sql`SELECT * FROM timescaledb_information.continuous_aggregates LIMIT 5`.execute(kysely);
+        const viewsResult = await sql`
+            SELECT * FROM timescaledb_information.continuous_aggregates LIMIT 5
+        `.execute(kysely);
         console.log("   已创建的视图:");
         if (viewsResult.rows.length > 0) {
             viewsResult.rows.forEach((row: any) => {
@@ -56,15 +60,24 @@ export async function checkAnalyticsStatus() {
     console.log("");
 
     // 4. 检查各聚合表数据
-    const views = ['run_stats_hourly', 'run_stats_15min', 'run_stats_daily', 'run_stats_weekly', 'run_stats_monthly'];
+    const views = [
+        "run_stats_hourly",
+        "run_stats_15min",
+        "run_stats_daily",
+        "run_stats_weekly",
+        "run_stats_monthly",
+    ];
     for (const viewName of views) {
-        console.log(`4.${views.indexOf(viewName) + 1} 检查 ${viewName} 数据...`);
+        console.log(
+            `4.${views.indexOf(viewName) + 1} 检查 ${viewName} 数据...`,
+        );
 
-        const timeColumn = viewName === 'run_stats_hourly' ? 'stat_hour' : 'stat_period';
+        const timeColumn =
+            viewName === "run_stats_hourly" ? "stat_hour" : "stat_period";
 
         try {
             // 检查视图是否存在
-            const existsResult = await sql`
+            const existsResult = await sql<{ exists: boolean }>`
                 SELECT EXISTS (
                     SELECT 1 FROM information_schema.views
                     WHERE table_name = ${sql.raw(`'${viewName}'`)}
@@ -77,17 +90,21 @@ export async function checkAnalyticsStatus() {
             }
 
             // 检查数据量
-            const countResult = await sql`SELECT COUNT(*) as count FROM ${sql.raw(viewName)}`.execute(kysely);
+            const countResult = await sql<{ count: number }>`
+                SELECT COUNT(*) as count FROM ${sql.raw(viewName)}
+            `.execute(kysely);
             const count = countResult.rows[0]?.count || 0;
             console.log(`   数据行数: ${count}`);
 
             if (count > 0) {
                 // 检查时间范围
-                const rangeResult = await sql`
+                const rangeResult = await sql<{ first_stat: Date; last_stat: Date }>`
                     SELECT MIN(${sql.raw(timeColumn)}) as first_stat, MAX(${sql.raw(timeColumn)}) as last_stat
                     FROM ${sql.raw(viewName)}
                 `.execute(kysely);
-                console.log(`   时间范围: ${rangeResult.rows[0]?.first_stat} ~ ${rangeResult.rows[0]?.last_stat}`);
+                console.log(
+                    `   时间范围: ${rangeResult.rows[0]?.first_stat} ~ ${rangeResult.rows[0]?.last_stat}`,
+                );
 
                 // 检查示例数据
                 const sampleResult = await sql`
@@ -98,10 +115,12 @@ export async function checkAnalyticsStatus() {
                 console.log(`   最新数据示例:`);
                 sampleResult.rows.slice(0, 2).forEach((row: any) => {
                     const time = row[timeColumn];
-                    const model = row.model_name || 'NULL';
-                    const system = row.system || 'NULL';
+                    const model = row.model_name || "NULL";
+                    const system = row.system || "NULL";
                     const totalRuns = row.total_runs || 0;
-                    console.log(`     - ${time}: model=${model}, system=${system}, total_runs=${totalRuns}`);
+                    console.log(
+                        `     - ${time}: model=${model}, system=${system}, total_runs=${totalRuns}`,
+                    );
                 });
             } else {
                 console.log(`   ⚠️  视图为空，需要初始化数据`);
@@ -137,7 +156,9 @@ export async function checkAnalyticsStatus() {
     console.log("6. 尝试手动刷新聚合...");
     for (const viewName of views) {
         try {
-            await sql`CALL refresh_continuous_aggregate(${sql.raw(`'${viewName}'`)}, NULL, NULL)`.execute(kysely);
+            await sql`CALL refresh_continuous_aggregate(${sql.raw(
+                `'${viewName}'`,
+            )}, NULL, NULL)`.execute(kysely);
             console.log(`   ✓ ${viewName} 刷新成功`);
         } catch (error: any) {
             console.log(`   ❌ ${viewName} 刷新失败: ${error.message}`);
@@ -148,8 +169,12 @@ export async function checkAnalyticsStatus() {
     // 7. 检查刷新后的数据
     console.log("7. 刷新后检查数据...");
     try {
-        const hourlyCount = await sql`SELECT COUNT(*) as count FROM run_stats_hourly`.execute(kysely);
-        console.log(`   run_stats_hourly 数据行数: ${hourlyCount.rows[0]?.count || 0}`);
+        const hourlyCount = await sql<{ count: number }>`
+            SELECT COUNT(*) as count FROM run_stats_hourly
+        `.execute(kysely);
+        console.log(
+            `   run_stats_hourly 数据行数: ${hourlyCount.rows[0]?.count || 0}`,
+        );
     } catch (error: any) {
         console.log(`   ❌ 错误: ${error.message}`);
     }
@@ -171,7 +196,9 @@ export async function checkAnalyticsStatus() {
         const result = await sql.raw(testQuery).execute(kysely);
         console.log(`   查询成功，返回 ${result.rows.length} 行数据`);
         result.rows.slice(0, 3).forEach((row: any) => {
-            console.log(`   - ${row.time}: total_tokens_sum=${row.total_tokens_sum}`);
+            console.log(
+                `   - ${row.time}: total_tokens_sum=${row.total_tokens_sum}`,
+            );
         });
     } catch (error: any) {
         console.log(`   ❌ 查询失败: ${error.message}`);

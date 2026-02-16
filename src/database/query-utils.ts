@@ -6,8 +6,8 @@ export function getStringAgg(column: string, distinct: boolean = true): any {
     const col = distinct ? sql`DISTINCT ${sql.ref(column)}` : sql.ref(column);
 
     if (dbType === "pg") {
-        return sql`STRING_AGG(${col}, ',')`;
+        return sql<string>`STRING_AGG(${col}, ',')`;
     }
 
-    return sql`GROUP_CONCAT(${col})`;
+    return sql<string>`GROUP_CONCAT(${col})`;
 }

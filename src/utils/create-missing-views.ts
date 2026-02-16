@@ -7,7 +7,7 @@ import { sql } from "kysely";
 
 export async function createMissingViews() {
     const kysely = await createKyselyInstance({
-        connectionString: process.env.TRACE_DATABASE_URL,
+        connectionString: process.env.TRACE_DATABASE_URL!,
     });
 
     console.log("=== 创建缺失的连续聚合视图 ===\n");
@@ -57,11 +57,15 @@ export async function createMissingViews() {
             `.execute(kysely);
             console.log("   ✓ run_stats_daily 刷新策略配置成功");
         } catch (policyError: any) {
-            console.log(`   ⚠️  run_stats_daily 刷新策略配置失败（可忽略）: ${policyError.message}`);
+            console.log(
+                `   ⚠️  run_stats_daily 刷新策略配置失败（可忽略）: ${policyError.message}`,
+            );
         }
 
         // 创建索引
-        await sql`CREATE INDEX IF NOT EXISTS idx_run_stats_daily_lookup ON run_stats_daily (stat_period DESC, model_name, system)`.execute(kysely);
+        await sql`
+            CREATE INDEX IF NOT EXISTS idx_run_stats_daily_lookup ON run_stats_daily (stat_period DESC, model_name, system)
+        `.execute(kysely);
         console.log("   ✓ run_stats_daily 索引创建成功");
     } catch (error: any) {
         console.log(`   ❌ run_stats_daily 创建失败: ${error.message}`);
@@ -113,11 +117,15 @@ export async function createMissingViews() {
             `.execute(kysely);
             console.log("   ✓ run_stats_weekly 刷新策略配置成功");
         } catch (policyError: any) {
-            console.log(`   ⚠️  run_stats_weekly 刷新策略配置失败（可忽略）: ${policyError.message}`);
+            console.log(
+                `   ⚠️  run_stats_weekly 刷新策略配置失败（可忽略）: ${policyError.message}`,
+            );
         }
 
         // 创建索引
-        await sql`CREATE INDEX IF NOT EXISTS idx_run_stats_weekly_lookup ON run_stats_weekly (stat_period DESC, model_name, system)`.execute(kysely);
+        await sql`
+            CREATE INDEX IF NOT EXISTS idx_run_stats_weekly_lookup ON run_stats_weekly (stat_period DESC, model_name, system)
+        `.execute(kysely);
         console.log("   ✓ run_stats_weekly 索引创建成功");
     } catch (error: any) {
         console.log(`   ❌ run_stats_weekly 创建失败: ${error.message}`);
@@ -169,11 +177,15 @@ export async function createMissingViews() {
             `.execute(kysely);
             console.log("   ✓ run_stats_monthly 刷新策略配置成功");
         } catch (policyError: any) {
-            console.log(`   ⚠️  run_stats_monthly 刷新策略配置失败（可忽略）: ${policyError.message}`);
+            console.log(
+                `   ⚠️  run_stats_monthly 刷新策略配置失败（可忽略）: ${policyError.message}`,
+            );
         }
 
         // 创建索引
-        await sql`CREATE INDEX IF NOT EXISTS idx_run_stats_monthly_lookup ON run_stats_monthly (stat_period DESC, model_name, system)`.execute(kysely);
+        await sql`
+            CREATE INDEX IF NOT EXISTS idx_run_stats_monthly_lookup ON run_stats_monthly (stat_period DESC, model_name, system)
+        `.execute(kysely);
         console.log("   ✓ run_stats_monthly 索引创建成功");
     } catch (error: any) {
         console.log(`   ❌ run_stats_monthly 创建失败: ${error.message}`);
@@ -182,10 +194,12 @@ export async function createMissingViews() {
 
     // 刷新所有视图
     console.log("4. 刷新所有视图...");
-    const views = ['run_stats_daily', 'run_stats_weekly', 'run_stats_monthly'];
+    const views = ["run_stats_daily", "run_stats_weekly", "run_stats_monthly"];
     for (const viewName of views) {
         try {
-            await sql`CALL refresh_continuous_aggregate(${sql.raw(`'${viewName}'`)}, NULL, NULL)`.execute(kysely);
+            await sql`CALL refresh_continuous_aggregate(${sql.raw(
+                `'${viewName}'`,
+            )}, NULL, NULL)`.execute(kysely);
             console.log(`   ✓ ${viewName} 刷新成功`);
         } catch (error: any) {
             console.log(`   ❌ ${viewName} 刷新失败: ${error.message}`);
@@ -194,7 +208,9 @@ export async function createMissingViews() {
     console.log("");
 
     console.log("=== 创建完成 ===\n");
-    console.log("注意：刷新策略配置失败通常是因为数据量不足，不影响基本功能使用。");
+    console.log(
+        "注意：刷新策略配置失败通常是因为数据量不足，不影响基本功能使用。",
+    );
     console.log("随着数据量的增加，可以手动重新配置刷新策略。\n");
 }
 

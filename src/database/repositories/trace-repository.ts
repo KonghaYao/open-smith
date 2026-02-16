@@ -36,7 +36,7 @@ export class TraceRepository {
             ])
             .where("trace_id", "is not", null)
             .groupBy("trace_id")
-            .orderBy(sql`MAX(created_at)`, "desc")
+            .orderBy(sql<RawTrace>`MAX(created_at)`, "desc")
             .execute();
 
         return Promise.all(
@@ -95,7 +95,7 @@ export class TraceRepository {
             .where("trace_id", "is not", null)
             .where("system", "=", system)
             .groupBy("trace_id")
-            .orderBy(sql`MAX(created_at)`, "desc")
+            .orderBy(sql<RawTrace>`MAX(created_at)`, "desc")
             .execute();
 
         return Promise.all(
@@ -155,7 +155,7 @@ export class TraceRepository {
             .where("trace_id", "is not", null)
             .where("thread_id", "=", threadId)
             .groupBy("trace_id")
-            .orderBy(sql`MAX(created_at)`, "desc")
+            .orderBy(sql<RawTrace>`MAX(created_at)`, "desc")
             .execute();
 
         return Promise.all(
@@ -215,7 +215,7 @@ export class TraceRepository {
             .where("trace_id", "is not", null)
             .where("user_id", "=", userId)
             .groupBy("trace_id")
-            .orderBy(sql`MAX(created_at)`, "desc")
+            .orderBy(sql<RawTrace>`MAX(created_at)`, "desc")
             .execute();
 
         return Promise.all(
@@ -292,7 +292,7 @@ export class TraceRepository {
 
         query = query
             .groupBy("thread_id")
-            .orderBy(sql`MAX(created_at)`, "desc");
+            .orderBy(sql<RawTrace>`MAX(created_at)`, "desc");
 
         if (limit !== undefined) {
             query = query.limit(limit);
@@ -393,7 +393,7 @@ export class TraceRepository {
 
         const traces = await query
             .groupBy("trace_id")
-            .orderBy(sql`MAX(created_at)`, "desc")
+            .orderBy(sql<RawTrace>`MAX(created_at)`, "desc")
             .limit(limit)
             .offset(offset)
             .execute();

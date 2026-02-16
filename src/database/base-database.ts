@@ -114,7 +114,7 @@ export class BaseDatabase {
 
         for (const tableName of requiredTables) {
             try {
-                const result = await sql`
+                const result = await sql<{ exists: boolean }>`
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables
                         WHERE table_schema = 'public'
@@ -122,7 +122,7 @@ export class BaseDatabase {
                     )
                 `.execute(this.db);
 
-                const exists = (result.rows[0] as any)?.exists;
+                const exists = result.rows[0]?.exists;
                 if (!exists) {
                     console.error(`Required table '${tableName}' does not exist after initialization`);
                     console.error(`Please check database initialization logs above`);
@@ -146,14 +146,14 @@ export class BaseDatabase {
         for (const viewName of views) {
             try {
                 // 检查视图是否存在
-                const result = await sql`
+                const result = await sql<{ exists: boolean }>`
                     SELECT EXISTS (
                         SELECT 1 FROM timescaledb_information.continuous_aggregates
                         WHERE view_name = ${sql.raw(`'${viewName}'`)}
                     )
                 `.execute(this.db);
 
-                const exists = (result.rows[0] as any)?.exists;
+                const exists = result.rows[0]?.exists;
 
                 if (exists) {
                     // 启用实时聚合 - 直接使用字符串插值，避免 sql.raw 嵌套问题
