@@ -19,6 +19,11 @@ const menuItems = [
         icon: <MessageSquareCode />,
     },
     {
+        href: "#/analytics",
+        title: "数据分析",
+        icon: <ChartBarBig />,
+    },
+    {
         href: "#/systems",
         title: "系统管理",
         icon: <Key />,
@@ -27,11 +32,6 @@ const menuItems = [
         href: "#/playground",
         title: "大模型测试",
         icon: <CirclePlay />,
-    },
-    {
-        href: "#/stats",
-        title: "统计分析",
-        icon: <ChartBarBig />,
     },
 ];
 

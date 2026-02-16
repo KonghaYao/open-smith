@@ -14,14 +14,14 @@ import type { RunRecord, AttachmentRecord } from "../../../src/types.js";
 // 输入输出标签页组件
 export const IOTab = (props: { run: RunRecord }) => {
     const tools = createMemo(() => {
-        const tools = JSON.parse(props.run.extra || "{}");
-        return tools?.options?.tools;
+        const extra = props.run.extra;
+        return extra?.options?.tools;
     });
     const inputs = createMemo(() => {
-        return JSON.parse(props.run.inputs || "{}");
+        return props.run.inputs;
     });
     const outputs = createMemo(() => {
-        return JSON.parse(props.run.outputs || "{}");
+        return props.run.outputs;
     });
 
     return (
@@ -101,14 +101,11 @@ const OutputsSection = (props: { run: RunRecord; outputs: any }) => {
             </h4>
             {props.run.error
                 ? (() => {
-                    let error = props.run.error as string;
-                    try {
-                        error = JSON.parse(error);
-                    } catch (e) { }
+                    let error = props.run.error as any;
                     return (
                         <div class="overflow-x-hidden">
                             <p class="text-red-500 text-sm whitespace-pre-wrap break-all">
-                                {error}
+                                {typeof error === 'string' ? error : JSON.stringify(error)}
                             </p>
                         </div>
                     );

@@ -1,10 +1,17 @@
 import { v4 as uuidv4 } from "uuid";
 
-export const formatTimestamp = (time: string | void) => {
-    if (time) {
-        return new Date(time).getTime().toFixed(0);
+export const formatTimestamp = (time: string | void): string | undefined => {
+    if (!time) {
+        return undefined;
     }
-    return;
+
+    const date = new Date(time);
+    if (isNaN(date.getTime())) {
+        console.warn(`Invalid timestamp: ${time}`);
+        return undefined;
+    }
+
+    return date.toISOString();
 };
 
 // 生成API密钥的辅助方法
@@ -14,7 +21,7 @@ export const generateApiKey = (): string => {
 
 // 从 outputs 字段中提取 total_tokens 的辅助方法
 export const extractTotalTokensFromOutputs = (
-    outputs?: string | object
+    outputs?: string | object,
 ): number => {
     if (!outputs) return 0;
     try {
@@ -47,7 +54,7 @@ export const extractTotalTokensFromOutputs = (
 
 // 从 events 字段中提取 time_to_first_token 的辅助方法
 export const extractTimeToFirstTokenFromEvents = (
-    events?: string | object
+    events?: string | object,
 ): number => {
     if (!events) return 0;
     try {
@@ -66,7 +73,7 @@ export const extractTimeToFirstTokenFromEvents = (
 
 // 从 outputs 字段中提取 model_name 的辅助方法
 export const extractModelNameFromOutputs = (
-    outputs?: string | object
+    outputs?: string | object,
 ): string | undefined => {
     if (!outputs) return undefined;
     try {

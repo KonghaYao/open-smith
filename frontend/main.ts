@@ -32,6 +32,38 @@ render(() => {
                     ),
                 }),
                 Route({
+                    path: "/analytics",
+                    component: lazy(() =>
+                        import("./pages/UnifiedDashboard.tsx").then((res) => {
+                            return { default: res.default };
+                        })
+                    ),
+                }),
+                Route({
+                    path: "/stats",
+                    component: lazy(() =>
+                        import("./pages/StatsPage.jsx").then((res) => {
+                            return { default: res.default };
+                        })
+                    ),
+                }),
+                Route({
+                    path: "/dashboard",
+                    component: lazy(() =>
+                        import("./pages/PerformanceDashboard.tsx").then((res) => {
+                            return { default: res.default };
+                        })
+                    ),
+                }),
+                Route({
+                    path: "/cost",
+                    component: lazy(() =>
+                        import("./pages/CostAnalysis.tsx").then((res) => {
+                            return { default: res.default };
+                        })
+                    ),
+                }),
+                Route({
                     path: "/systems",
                     component: lazy(() =>
                         import("./pages/SystemsPage.jsx").then((res) => {
@@ -44,14 +76,6 @@ render(() => {
                     component: lazy(() =>
                         import("./pages/PlayGround/index.jsx").then((res) => {
                             return { default: res.PlayGround };
-                        })
-                    ),
-                }),
-                Route({
-                    path: "/stats",
-                    component: lazy(() =>
-                        import("./pages/StatsPage.jsx").then((res) => {
-                            return { default: res.default };
                         })
                     ),
                 }),

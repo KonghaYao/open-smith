@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # Optional: TimescaleDB for production
+  timescaledb:
+    image: timescale/timescaledb:latest-pg17
+    container_name: open-smith-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: open_smith
+    ports:
+      - "5434:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Open Smith application
+  open-smith:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: open-smith-app
+    environment:
+      NODE_ENV: production
+      PORT: 7765
+      # Use TimescaleDB or SQLite (comment out to use SQLite)
+      TRACE_DATABASE_URL: postgresql://postgres:postgres@timescaledb:5432/open_smith
+      # Required: Set your master key
+      MASTER_KEY: ${MASTER_KEY:-change-this-to-a-secure-key}
+    ports:
+      - "7765:7765"
+    volumes:
+      - attachments_data:/app/attachments
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumesolumes:
+  timescaledb_data:
+  attachments_data:

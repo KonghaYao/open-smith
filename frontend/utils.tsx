@@ -49,7 +49,7 @@ export interface UserStoreType {
 }
 
 const [userStore, _setUserStore] = createSignal<UserStoreType>(
-    JSON.parse(localStorage.getItem("userStore") || JSON.stringify({}))
+    JSON.parse(localStorage.getItem("userStore") || JSON.stringify({})),
 );
 
 const setUserStore = (data: UserStoreType) => {
@@ -64,7 +64,7 @@ const patchUserStore = (data: Partial<UserStoreType>) => {
 
 export const createStoreSignal = <T extends keyof UserStoreType>(
     key: T,
-    defaultValue: UserStoreType[T]
+    defaultValue: UserStoreType[T],
 ) => {
     const value = createMemo(() => userStore()[key] || defaultValue);
     return [
@@ -147,7 +147,7 @@ export const getRunType = (run?: RunRecord): keyof typeof icon => {
     }
     if (run.serialized) {
         try {
-            const serialized = JSON.parse(run.serialized);
+            const serialized = run.serialized;
             if (serialized.id) {
                 return serialized.id[serialized.id.length - 1];
             }
@@ -159,12 +159,5 @@ export const getRunType = (run?: RunRecord): keyof typeof icon => {
 };
 
 export const getMetaDataOfRun = (run: RunRecord) => {
-    if (run.extra) {
-        try {
-            const extra = JSON.parse(run.extra);
-            return extra.metadata;
-        } catch {
-            return null;
-        }
-    }
+    return run?.extra?.metadata;
 };

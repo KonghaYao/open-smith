@@ -18,15 +18,16 @@ export const RunsList = (props: RunsListProps) => {
     const runs = createMemo(() => {
         const runs = (props.currentTraceData()?.runs || []).map(
             (i: RunRecord) => {
-                return { ...i, extraData: JSON.parse(i.extra!) };
-            }
+                return { ...i, extraData: i.extra };
+            },
         );
         // 第一阶段：重新排序
         const groupList = new Map();
         runs.forEach((i) => {
-            const metadata = i.extraData.metadata;
+            const metadata = i.extraData?.metadata;
             const checkpointNs =
-                metadata.checkpoint_ns || metadata.langgraph_checkpoint_ns;
+                metadata?.checkpoint_ns || metadata?.langgraph_checkpoint_ns;
+
             if (groupList.get(checkpointNs)) {
                 groupList.get(checkpointNs).push(i);
             } else {
@@ -46,7 +47,11 @@ export const RunsList = (props: RunsListProps) => {
         if (showNoneTime() || run.run_type === "tool") {
             return true;
         }
-        return parseInt(run.end_time) - parseInt(run.start_time) > 10;
+        return (
+            new Date(run.end_time).getTime() -
+                new Date(run.start_time).getTime() >
+            10
+        );
     };
 
     const totalDuration = createMemo(() => {
@@ -73,7 +78,8 @@ export const RunsList = (props: RunsListProps) => {
                     <button
                         class="p-1 text-gray-500 hover:text-blue-600 transition-colors"
                         onClick={props.refresh}
-                        title="刷新数据">
+                        title="刷新数据"
+                    >
                         <RefreshCcw class="w-4 h-4" />
                     </button>
                 </div>
@@ -94,7 +100,7 @@ export const RunsList = (props: RunsListProps) => {
                                     isSelected: () =>
                                         props.selectedRunId() === run.id,
                                     onSelect: props.onRunSelect,
-                                })
+                                }),
                         )}
                     </div>
                 )}
@@ -119,7 +125,8 @@ export const RunsList = (props: RunsListProps) => {
                 </div>
                 <button
                     class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-lg shadow hover:from-blue-600 hover:to-blue-700 transition font-medium"
-                    onClick={() => setShowNoneTime(!showNoneTime())}>
+                    onClick={() => setShowNoneTime(!showNoneTime())}
+                >
                     {showNoneTime() ? "隐藏无耗时步骤" : "显示无耗时步骤"}
                 </button>
             </div>

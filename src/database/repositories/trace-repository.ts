@@ -7,8 +7,8 @@ import { getStringAgg } from "../query-utils.js";
 type RawTrace = {
     trace_id: string;
     total_runs: number;
-    first_run_time: string;
-    last_run_time: string;
+    first_run_time: Date;
+    last_run_time: Date;
     run_types: string;
     systems: string;
     total_tokens_sum: number;
@@ -36,7 +36,7 @@ export class TraceRepository {
             ])
             .where("trace_id", "is not", null)
             .groupBy("trace_id")
-            .orderBy(sql`MAX(created_at)`, "desc")
+            .orderBy(sql<RawTrace>`MAX(created_at)`, "desc")
             .execute();
 
         return Promise.all(
@@ -61,8 +61,12 @@ export class TraceRepository {
                     total_runs: Number(trace.total_runs),
                     total_feedback: Number(feedbackCount?.count ?? 0),
                     total_attachments: Number(attachmentCount?.count ?? 0),
-                    first_run_time: trace.first_run_time,
-                    last_run_time: trace.last_run_time,
+                    first_run_time: trace.first_run_time
+                        ? new Date(trace.first_run_time).toISOString()
+                        : "",
+                    last_run_time: trace.last_run_time
+                        ? new Date(trace.last_run_time).toISOString()
+                        : "",
                     run_types: trace.run_types
                         ? trace.run_types.split(",").filter(Boolean)
                         : [],
@@ -91,7 +95,7 @@ export class TraceRepository {
             .where("trace_id", "is not", null)
             .where("system", "=", system)
             .groupBy("trace_id")
-            .orderBy(sql`MAX(created_at)`, "desc")
+            .orderBy(sql<RawTrace>`MAX(created_at)`, "desc")
             .execute();
 
         return Promise.all(
@@ -116,8 +120,12 @@ export class TraceRepository {
                     total_runs: Number(trace.total_runs),
                     total_feedback: Number(feedbackCount?.count ?? 0),
                     total_attachments: Number(attachmentCount?.count ?? 0),
-                    first_run_time: trace.first_run_time ?? "",
-                    last_run_time: trace.last_run_time ?? "",
+                    first_run_time: trace.first_run_time
+                        ? new Date(trace.first_run_time).toISOString()
+                        : "",
+                    last_run_time: trace.last_run_time
+                        ? new Date(trace.last_run_time).toISOString()
+                        : "",
                     run_types: trace.run_types
                         ? trace.run_types.split(",").filter(Boolean)
                         : [],
@@ -147,7 +155,7 @@ export class TraceRepository {
             .where("trace_id", "is not", null)
             .where("thread_id", "=", threadId)
             .groupBy("trace_id")
-            .orderBy(sql`MAX(created_at)`, "desc")
+            .orderBy(sql<RawTrace>`MAX(created_at)`, "desc")
             .execute();
 
         return Promise.all(
@@ -172,8 +180,12 @@ export class TraceRepository {
                     total_runs: Number(trace.total_runs),
                     total_feedback: Number(feedbackCount?.count ?? 0),
                     total_attachments: Number(attachmentCount?.count ?? 0),
-                    first_run_time: trace.first_run_time ?? "",
-                    last_run_time: trace.last_run_time ?? "",
+                    first_run_time: trace.first_run_time
+                        ? new Date(trace.first_run_time).toISOString()
+                        : "",
+                    last_run_time: trace.last_run_time
+                        ? new Date(trace.last_run_time).toISOString()
+                        : "",
                     run_types: trace.run_types
                         ? trace.run_types.split(",").filter(Boolean)
                         : [],
@@ -203,7 +215,7 @@ export class TraceRepository {
             .where("trace_id", "is not", null)
             .where("user_id", "=", userId)
             .groupBy("trace_id")
-            .orderBy(sql`MAX(created_at)`, "desc")
+            .orderBy(sql<RawTrace>`MAX(created_at)`, "desc")
             .execute();
 
         return Promise.all(
@@ -228,8 +240,12 @@ export class TraceRepository {
                     total_runs: Number(trace.total_runs),
                     total_feedback: Number(feedbackCount?.count ?? 0),
                     total_attachments: Number(attachmentCount?.count ?? 0),
-                    first_run_time: trace.first_run_time ?? "",
-                    last_run_time: trace.last_run_time ?? "",
+                    first_run_time: trace.first_run_time
+                        ? new Date(trace.first_run_time).toISOString()
+                        : "",
+                    last_run_time: trace.last_run_time
+                        ? new Date(trace.last_run_time).toISOString()
+                        : "",
                     run_types: trace.run_types
                         ? trace.run_types.split(",").filter(Boolean)
                         : [],
@@ -276,7 +292,7 @@ export class TraceRepository {
 
         query = query
             .groupBy("thread_id")
-            .orderBy(sql`MAX(created_at)`, "desc");
+            .orderBy(sql<RawTrace>`MAX(created_at)`, "desc");
 
         if (limit !== undefined) {
             query = query.limit(limit);
@@ -315,8 +331,12 @@ export class TraceRepository {
                     total_traces: Number(thread.total_traces ?? 0),
                     total_feedback: Number(feedbackCount?.count ?? 0),
                     total_attachments: Number(attachmentCount?.count ?? 0),
-                    first_run_time: thread.first_run_time ?? "",
-                    last_run_time: thread.last_run_time ?? "",
+                    first_run_time: thread.first_run_time
+                        ? new Date(thread.first_run_time).toISOString()
+                        : "",
+                    last_run_time: thread.last_run_time
+                        ? new Date(thread.last_run_time).toISOString()
+                        : "",
                     run_types: thread.run_types
                         ? thread.run_types.split(",").filter(Boolean)
                         : [],
@@ -373,7 +393,7 @@ export class TraceRepository {
 
         const traces = await query
             .groupBy("trace_id")
-            .orderBy(sql`MAX(created_at)`, "desc")
+            .orderBy(sql<RawTrace>`MAX(created_at)`, "desc")
             .limit(limit)
             .offset(offset)
             .execute();
@@ -400,8 +420,12 @@ export class TraceRepository {
                     total_runs: Number(trace.total_runs),
                     total_feedback: Number(feedbackCount?.count ?? 0),
                     total_attachments: Number(attachmentCount?.count ?? 0),
-                    first_run_time: trace.first_run_time ?? "",
-                    last_run_time: trace.last_run_time ?? "",
+                    first_run_time: trace.first_run_time
+                        ? new Date(trace.first_run_time).toISOString()
+                        : "",
+                    last_run_time: trace.last_run_time
+                        ? new Date(trace.last_run_time).toISOString()
+                        : "",
                     run_types: trace.run_types
                         ? Array.from(
                               new Set(

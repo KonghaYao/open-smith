@@ -12,8 +12,9 @@ export const RunItem = (props: {
         props.onSelect(props.run.id);
     };
     const cardClass = () => {
-        return `bg-white  rounded-lg cursor-pointer   ${props.isSelected() ? "ring-2 ring-blue-500 " : ""
-            }`;
+        return `bg-white  rounded-lg cursor-pointer   ${
+            props.isSelected() ? "ring-2 ring-blue-500 " : ""
+        }`;
     };
     const metadata = createMemo(() => getMetaDataOfRun(props.run));
 
@@ -26,8 +27,7 @@ export const RunItem = (props: {
         return props.run.total_tokens;
     });
     const modelName = createMemo(() => {
-
-        return props.run.model_name || metadata().ls_model_name;
+        return props.run.model_name || metadata()?.ls_model_name;
     });
     // 改为 tsx 语法
 
@@ -36,19 +36,23 @@ export const RunItem = (props: {
             <div
                 class="flex mb-2 flex-wrap"
                 style={{
-                    "padding-left": `${calcLevelFromCheckpointNs(
-                        props.run.name,
-                        metadata(),
-                        getRunType(props.run)
-                    ) * 20
-                        }px`,
-                }}>
+                    "padding-left": `${
+                        calcLevelFromCheckpointNs(
+                            props.run.name,
+                            metadata(),
+                            getRunType(props.run),
+                        ) * 20
+                    }px`,
+                }}
+            >
                 <div class="text-gray-400 text-left">
                     {(icon[getRunType(props.run)] ?? icon.unknown)()}
                 </div>
                 <div
-                    class={`px-2 font-medium ${props.run.error ? "text-red-500" : "text-gray-900"
-                        }`}>
+                    class={`px-2 font-medium ${
+                        props.run.error ? "text-red-500" : "text-gray-900"
+                    }`}
+                >
                     {props.run.name}
                 </div>
                 <div class="flex space-x-2 flex-wrap">
@@ -78,22 +82,20 @@ export const RunItem = (props: {
     );
 };
 export const calcTpsFromRun = (run: RunRecord) => {
-    const data = JSON.parse(run.outputs || "{}");
-    const totalTokens = data.generations
-        .flat()
-        .map((i: any) => i.message)
-        .reduce((acc: number, cur: any) => {
-            return acc + (cur?.kwargs?.usage_metadata?.output_tokens || 0);
-        }, 0);
+    const data = run.outputs;
+    console.log(run);
+    if (!data) return 0;
+    const totalTokens = run.outputs?.llmOutput?.tokenUsage?.completionTokens;
     /** @ts-ignore */
-    const duration = run.end_time - run.start_time;
+    const duration =
+        new Date(run.end_time).getTime() - new Date(run.start_time).getTime();
     return (totalTokens / duration) * 1000;
 };
 
 const calcLevelFromCheckpointNs = (
     name: string,
     metadata: any,
-    type: string
+    type: string,
 ) => {
     const checkpointNs = metadata.langgraph_checkpoint_ns;
 

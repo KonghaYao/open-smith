@@ -11,6 +11,7 @@ import { ApiKeyCache } from "./api-key-cache.js"; // 更新导入路径
 import { createAdminRouter } from "./routes/admin-routes.js";
 import { createRunsRouter } from "./routes/runs-routes.js";
 import { createStatsRouter } from "./routes/stats-router.js";
+import { createAnalyticsRouter } from "./routes/analytics/analytics-router.js";
 
 import path from "path";
 import fs from "fs";
@@ -27,7 +28,7 @@ const app = new Hono();
 
 // 使用 Kysely 创建数据库实例
 let kysely = await createKyselyInstance({
-    connectionString: process.env.TRACE_DATABASE_URL || ":memory:",
+    connectionString: process.env.TRACE_DATABASE_URL!,
 });
 
 const db = new TraceDatabase(kysely);
@@ -54,6 +55,10 @@ app.route("/runs", runsRouter);
 const statsRouter = createStatsRouter(db);
 app.route("/stats", statsRouter);
 
+// 创建并挂载 analytics 路由器
+const analyticsRouter = createAnalyticsRouter(kysely);
+app.route("/v1/analytics", analyticsRouter);
+
 app.use(logger());
 
 // /v1/metadata/submit 路由已移动到 runs-routes.ts
@@ -79,7 +84,7 @@ app.route("/llm", llmRouter);
 app.get("/info", (c) => {
     return c.json({
         // API 版本
-        version: "0.10.107",
+        version: "2.4.0",
         // 实例功能标志
         instance_flags: {
             // Blob 存储是否启用
@@ -117,6 +122,8 @@ app.get("/info", (c) => {
             workspace_scope_org_invites: false,
             // ZSTD 压缩是否启用 (新增)
             zstd_compression_enabled: false,
+            // TimescaleDB 支持 (新增)
+            timescaledb_enabled: true,
         },
         // 批量摄取配置
         batch_ingest_config: {
@@ -162,6 +169,17 @@ app.get("/info", (c) => {
             run_feedback: "GET /runs/{runId}/feedback - Get run feedback",
             run_attachments:
                 "GET /runs/{runId}/attachments - Get run attachments",
+            // Analytics 端点 (新增)
+            analytics_timeseries:
+                "GET /api/v1/analytics/timeseries - Time series aggregation with multiple metrics and dimensions",
+            analytics_trends:
+                "GET /api/v1/analytics/trends - Trend analysis (DoD, WoW, MoM)",
+            analytics_compare:
+                "GET /api/v1/analytics/compare - Performance comparison between models, systems, or time periods",
+            analytics_anomalies:
+                "GET /api/v1/analytics/anomalies - Anomaly detection based on statistical analysis",
+            analytics_summary:
+                "GET /api/v1/analytics/summary - Summary statistics for a given time range",
             // 管理接口
             cache_stats:
                 "GET /admin/cache/stats - Get API key cache statistics",
