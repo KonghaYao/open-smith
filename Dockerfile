@@ -7,7 +7,7 @@ FROM oven/bun:1.3.9-alpine AS builder
 WORKDIR /app
 
 # Copy dependency files
-COPY package.json package-lock.json pnpm-lock.yaml* ./
+COPY package.json pnpm-lock.yaml* ./
 
 # Install pnpm and dependencies
 RUN bun install -g pnpm && \
@@ -38,7 +38,6 @@ RUN apk add --no-cache \
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/sql ./sql
 COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/package-lock.json* ./package-lock.json*
 COPY --from=builder /app/pnpm-lock.yaml* ./pnpm-lock.yaml*
 
 # Create directories for runtime
