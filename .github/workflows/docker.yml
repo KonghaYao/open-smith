@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Docker image version tag (e.g., 2.4.0, 2.4.0-beta, latest)'
+        required: true
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -39,9 +45,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            ${{ github.event_name == 'workflow_dispatch' && format('type=raw,value={0}', github.event.inputs.version) || '' }}
+            ${{ github.event_name == 'push' && 'type=semver,pattern={{version}}' || '' }}
+            ${{ github.event_name == 'push' && 'type=semver,pattern={{major}}.{{minor}}' || '' }}
+            ${{ github.event_name == 'push' && 'type=semver,pattern={{major}}' || '' }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
