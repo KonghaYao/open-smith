@@ -43,8 +43,8 @@ COPY --from=builder /app/pnpm-lock.yaml* ./pnpm-lock.yaml*
 # Create directories for runtime
 RUN mkdir -p /app/attachments /app/sql
 
-# Install dependencies (Bun will use cache if available)
-RUN bun install
+# We don't need install, all deps bundled
+# RUN bun install
 
 # Set default environment variables
 ENV NODE_ENV=production
